@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: menu-display-ai
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
