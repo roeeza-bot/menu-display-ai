@@ -40,6 +40,27 @@ def index():
 
 @app.route("/extract", methods=["POST"])
 def extract():
+    try:
+        data = request.get_json()
+        raw_text = data.get("text", "")
+
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            instructions=SYSTEM_PROMPT,
+            input=raw_text,
+            temperature=0
+        )
+
+        # 👇 זה התיקון הכי חשוב
+        result_text = response.output[0].content[0].text
+
+        # הופך ל-JSON אמיתי
+        result_json = json.loads(result_text)
+
+        return jsonify(result_json)
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
     data = request.get_json()
     raw_text = data.get("text", "")
 
