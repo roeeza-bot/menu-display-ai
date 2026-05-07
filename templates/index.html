@@ -5,169 +5,230 @@
 <title>Menu Display AI</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#f3f3f3}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f3f3f3;color:#111827}
 .app{padding:20px}
-textarea,input{width:100%;padding:10px;margin-top:8px;border:1px solid #ccc}
-button{width:100%;padding:12px;margin-top:10px;font-weight:bold}
+.box{background:white;padding:20px;border-radius:16px;margin-bottom:18px}
+textarea,input{width:100%;box-sizing:border-box;padding:10px;margin-top:8px;border:1px solid #c7c7cc;font-family:Arial}
+textarea{min-height:64px}
+button{width:100%;padding:12px;margin-top:10px;font-weight:bold;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-.display{
-width:794px;
-min-height:1123px;
-background:white;
-margin:30px auto;
-padding:40px;
+.page{width:794px;height:1123px;background:white;margin:30px auto;padding:58px;box-sizing:border-box;position:relative}
+.top{display:flex;justify-content:space-between;align-items:center;direction:ltr}
+.logo{font-weight:900;letter-spacing:2px}
+.kosher{font-weight:800;display:flex;align-items:center;gap:8px}
+.dot{width:13px;height:13px;border-radius:50%;display:inline-block}
+.meat{color:#d92d20}.meat .dot{background:#d92d20}
+.dairy{color:#2563eb}.dairy .dot{background:#2563eb}
+.parve{color:#039855}.parve .dot{background:#039855}
+
+.category{display:inline-block;margin-top:28px;background:#f2f4f7;border-radius:18px;padding:8px 14px;color:#475467;font-size:14px}
+.line{border-top:1px solid #e5e7eb;margin:22px 0}
+
+.price-row{display:flex;justify-content:space-between;align-items:center;direction:ltr}
+.price-label{font-size:13px;font-weight:900;color:#667085;letter-spacing:1px}
+.price-sub{font-size:14px;color:#667085;margin-top:4px}
+.price{font-size:36px;font-weight:900}
+
+.en{direction:ltr;text-align:left}
+.he{direction:rtl;text-align:right;margin-top:28px}
+.title{font-size:33px;font-weight:900;line-height:1.05;margin-bottom:10px}
+.desc{font-size:17px;line-height:1.45;color:#344054}
+.section-title{font-size:13px;font-weight:900;letter-spacing:1.5px;color:#667085;text-transform:uppercase;margin-top:16px}
+.ingredients{font-size:13px;line-height:1.35;color:#344054;margin-top:6px}
+
+.allergens-box{position:absolute;left:58px;right:58px;bottom:46px;background:#f8fafc;border-radius:18px;padding:14px 16px}
+.allergens-title{font-size:13px;font-weight:900;letter-spacing:1.4px;color:#667085;margin-bottom:8px}
+.allergens-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0 16px}
+.allergen{display:flex;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding:5px 0;font-size:13px}
+.allergen span:first-child{direction:ltr;text-align:left}
+.allergen span:last-child{direction:rtl;text-align:right;font-weight:700}
+
+@media print{
+  @page{size:A4;margin:0}
+  body{background:white}
+  .app{display:none}
+  .page{margin:0;width:794px;height:1123px}
 }
-
-.top{
-display:flex;
-justify-content:space-between;
-direction:ltr;
-}
-
-.logo{font-weight:bold}
-.kosher-meat{color:red}
-.kosher-dairy{color:blue}
-.kosher-parve{color:green}
-
-.category{
-background:#eee;
-padding:5px 12px;
-border-radius:12px;
-margin-top:10px;
-display:inline-block;
-}
-
-.price{font-size:30px;font-weight:bold;margin-top:20px;text-align:right}
-
-.title{font-size:32px;font-weight:bold;margin-top:20px}
-.desc{margin-top:10px}
-
-.section-title{margin-top:20px;font-weight:bold;color:#666}
-
-.allergens{border:1px solid #ccc;padding:10px;margin-top:20px;border-radius:10px}
 </style>
 </head>
 
 <body>
 
 <div class="app">
+  <div class="box">
+    <h2>הדבק טקסט</h2>
+    <textarea id="raw" placeholder="הדבק כאן טקסט מה-PDF"></textarea>
+    <button onclick="runExtract()">Extract</button>
+  </div>
 
-<textarea id="raw"></textarea>
-<button onclick="runExtract()">Extract</button>
+  <div class="box">
+    <h2>הזנה ידנית / עריכה לפני יצירת Display</h2>
+    <div class="grid">
+      <input id="dishNameEn" placeholder="Dish name - English">
+      <input id="dishNameHe" placeholder="שם מנה - עברית">
 
-<input id="dishNameEn" placeholder="English name">
-<input id="dishNameHe" placeholder="שם בעברית">
+      <textarea id="descEn" placeholder="Description - English"></textarea>
+      <textarea id="descHe" placeholder="תיאור מנה - עברית"></textarea>
 
-<textarea id="descEn" placeholder="Description EN"></textarea>
-<textarea id="descHe" placeholder="תיאור"></textarea>
+      <textarea id="ingredientsEn" placeholder="Ingredients - English"></textarea>
+      <textarea id="ingredientsHe" placeholder="רכיבים - עברית"></textarea>
 
-<textarea id="ingredientsEn" placeholder="Ingredients EN"></textarea>
-<textarea id="ingredientsHe" placeholder="רכיבים"></textarea>
+      <textarea id="allergensEn" placeholder="Allergens EN - comma separated"></textarea>
+      <textarea id="allergensHe" placeholder="אלרגנים בעברית - מופרדים בפסיקים"></textarea>
 
-<textarea id="allergensEn" placeholder="Allergens EN"></textarea>
-<textarea id="allergensHe" placeholder="אלרגנים"></textarea>
+      <input id="priceInput" placeholder="מחיר">
+      <input id="stationInput" placeholder="קטגוריה: Sandwich / Fish Special / Grill">
+      <input id="kosherInput" placeholder="כשרות: בשרי / חלבי / פרווה">
+    </div>
 
-<input id="price" placeholder="מחיר">
-<input id="station" placeholder="קטגוריה">
-<input id="kosher" placeholder="כשרות">
-
-<button onclick="createDisplay()">Create</button>
-<button onclick="window.print()">PDF</button>
-
+    <button onclick="createDisplay()">Create Display</button>
+    <button onclick="generatePDF()">PDF</button>
+  </div>
 </div>
 
-<div class="display">
+<div class="page" id="finalDisplay">
 
-<div class="top">
-<div class="logo">CAFFÈ MACS</div>
-<div id="kosherOut"></div>
-</div>
+  <div class="top">
+    <div class="logo">CAFFÈ MACS</div>
+    <div class="kosher" id="kosherOut"><span class="dot"></span><span></span></div>
+  </div>
 
-<div id="categoryOut" class="category"></div>
+  <div class="category" id="categoryOut"></div>
 
-<div id="priceOut" class="price"></div>
+  <div class="line"></div>
 
-<div id="nameEnOut" class="title"></div>
-<div id="descEnOut" class="desc"></div>
+  <div class="price-row">
+    <div>
+      <div class="price-label">DISH PRICE / מחיר מנה</div>
+      <div class="price-sub">Includes side / כולל תוספת</div>
+    </div>
+    <div class="price" id="priceOut"></div>
+  </div>
 
-<div class="section-title">Ingredients</div>
-<div id="ingEnOut"></div>
+  <div class="line"></div>
 
-<hr>
+  <div class="en">
+    <div class="title" id="nameEnOut"></div>
+    <div class="desc" id="descEnOut"></div>
+    <div class="section-title">INGREDIENTS</div>
+    <div class="ingredients" id="ingEnOut"></div>
+  </div>
 
-<div id="nameHeOut" class="title"></div>
-<div id="descHeOut" class="desc"></div>
+  <div class="line"></div>
 
-<div class="section-title">רכיבים</div>
-<div id="ingHeOut"></div>
+  <div class="he">
+    <div class="title" id="nameHeOut"></div>
+    <div class="desc" id="descHeOut"></div>
+    <div class="section-title">רכיבים</div>
+    <div class="ingredients" id="ingHeOut"></div>
+  </div>
 
-<div class="allergens">
-<div class="section-title">Allergens</div>
-<div id="allergensOut"></div>
-</div>
+  <div class="allergens-box">
+    <div class="allergens-title">ALLERGENS / אלרגנים</div>
+    <div class="allergens-grid" id="allergensOut"></div>
+  </div>
 
 </div>
 
 <script>
-function safe(v){return v||""}
+function el(id){return document.getElementById(id)}
+function safe(v){return v || ""}
 
-function splitCategory(cat){
-let station=cat
-let kosher=""
+function cleanStation(cat){
+  return safe(cat)
+    .replace(/\s*\(Meat\)\s*/i,"")
+    .replace(/\s*\(Dairy\)\s*/i,"")
+    .replace(/\s*\(Parve\)\s*/i,"")
+    .trim()
+}
 
-if(cat.includes("Meat")){kosher="בשרי";station=cat.replace("(Meat)","")}
-if(cat.includes("Dairy")){kosher="חלבי";station=cat.replace("(Dairy)","")}
-if(cat.includes("Parve")){kosher="פרווה";station=cat.replace("(Parve)","")}
+function kosherFromCategory(cat){
+  cat = safe(cat)
+  if(cat.toLowerCase().includes("meat")) return "בשרי"
+  if(cat.toLowerCase().includes("dairy")) return "חלבי"
+  if(cat.toLowerCase().includes("parve")) return "פרווה"
+  return ""
+}
 
-return{station,kosher}
+function formatPrice(v){
+  v = safe(v).replace("₪","").trim()
+  if(!v) return ""
+  if(v.includes(".")) return "₪" + v
+  return "₪" + v + ".00"
 }
 
 async function runExtract(){
-const res=await fetch("/extract",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({text:raw.value})
-})
+  const res = await fetch("/extract",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text:el("raw").value})
+  })
 
-const d=await res.json()
+  const d = await res.json()
 
-const cat=splitCategory(safe(d.category))
+  if(d.error){
+    alert("Error: " + d.error)
+    return
+  }
 
-dishNameEn.value=safe(d.dish_name_en)
-dishNameHe.value=safe(d.dish_name_he)
-descEn.value=safe(d.description_en)
-descHe.value=safe(d.description_he)
-ingredientsEn.value=safe(d.ingredients_en)
-ingredientsHe.value=safe(d.ingredients_he)
-allergensEn.value=safe(d.allergens_en)
-allergensHe.value=safe(d.allergens_he)
-station.value=cat.station
-kosher.value=cat.kosher
+  el("dishNameEn").value = safe(d.dish_name_en)
+  el("dishNameHe").value = safe(d.dish_name_he)
+  el("descEn").value = safe(d.description_en)
+  el("descHe").value = safe(d.description_he)
+  el("ingredientsEn").value = safe(d.ingredients_en)
+  el("ingredientsHe").value = safe(d.ingredients_he)
+  el("allergensEn").value = safe(d.allergens_en)
+  el("allergensHe").value = safe(d.allergens_he)
 
-createDisplay()
+  el("stationInput").value = cleanStation(d.category)
+  el("kosherInput").value = safe(d.kosher) || kosherFromCategory(d.category)
+
+  createDisplay()
 }
 
 function createDisplay(){
+  el("priceOut").innerText = formatPrice(el("priceInput").value)
 
-priceOut.innerText=price.value? "₪"+price.value:""
+  const station = el("stationInput").value
+  const kosher = el("kosherInput").value
 
-categoryOut.innerText=station.value
+  el("categoryOut").innerText = station ? station + " / " + station : ""
 
-kosherOut.innerText=kosher.value
-kosherOut.className=""
+  const kOut = el("kosherOut")
+  kOut.className = "kosher"
+  kOut.innerHTML = '<span class="dot"></span><span>' + kosher + '</span>'
 
-if(kosher.value=="בשרי")kosherOut.className="kosher-meat"
-if(kosher.value=="חלבי")kosherOut.className="kosher-dairy"
-if(kosher.value=="פרווה")kosherOut.className="kosher-parve"
+  if(kosher.includes("בשר")) kOut.classList.add("meat")
+  if(kosher.includes("חלב")) kOut.classList.add("dairy")
+  if(kosher.includes("פרווה")) kOut.classList.add("parve")
 
-nameEnOut.innerText=dishNameEn.value
-nameHeOut.innerText=dishNameHe.value
-descEnOut.innerText=descEn.value
-descHeOut.innerText=descHe.value
-ingEnOut.innerText=ingredientsEn.value
-ingHeOut.innerText=ingredientsHe.value
+  el("nameEnOut").innerText = el("dishNameEn").value
+  el("nameHeOut").innerText = el("dishNameHe").value
+  el("descEnOut").innerText = el("descEn").value
+  el("descHeOut").innerText = el("descHe").value
+  el("ingEnOut").innerText = el("ingredientsEn").value
+  el("ingHeOut").innerText = el("ingredientsHe").value
 
-allergensOut.innerText=allergensEn.value+" / "+allergensHe.value
+  const en = el("allergensEn").value.split(",").map(x=>x.trim()).filter(Boolean)
+  const he = el("allergensHe").value.split(",").map(x=>x.trim()).filter(Boolean)
+  const max = Math.max(en.length, he.length)
+
+  el("allergensOut").innerHTML = ""
+
+  for(let i=0;i<max;i++){
+    const row = document.createElement("div")
+    row.className = "allergen"
+    row.innerHTML = "<span>" + safe(en[i]) + "</span><span>" + safe(he[i]) + "</span>"
+    el("allergensOut").appendChild(row)
+  }
+
+  el("finalDisplay").scrollIntoView({behavior:"smooth",block:"start"})
+}
+
+function generatePDF(){
+  createDisplay()
+  setTimeout(()=>window.print(),300)
 }
 </script>
 
