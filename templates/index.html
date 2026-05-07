@@ -5,137 +5,46 @@
 <title>Menu Display AI</title>
 
 <style>
-body {
-  margin:0;
-  font-family: Arial, Helvetica, sans-serif;
-  background:#f3f3f3;
-  color:#1d1d1f;
+body{margin:0;font-family:Arial;background:#f3f3f3}
+.app{padding:20px}
+textarea,input{width:100%;padding:10px;margin-top:8px;border:1px solid #ccc}
+button{width:100%;padding:12px;margin-top:10px;font-weight:bold}
+
+.display{
+width:794px;
+min-height:1123px;
+background:white;
+margin:30px auto;
+padding:40px;
 }
 
-.app {
-  padding:20px;
+.top{
+display:flex;
+justify-content:space-between;
+direction:ltr;
 }
 
-.box {
-  background:white;
-  padding:20px;
-  border-radius:16px;
-  margin-bottom:20px;
+.logo{font-weight:bold}
+.kosher-meat{color:red}
+.kosher-dairy{color:blue}
+.kosher-parve{color:green}
+
+.category{
+background:#eee;
+padding:5px 12px;
+border-radius:12px;
+margin-top:10px;
+display:inline-block;
 }
 
-textarea, input {
-  width:100%;
-  padding:10px;
-  margin-top:8px;
-  border:1px solid #ccc;
-  box-sizing:border-box;
-}
+.price{font-size:30px;font-weight:bold;margin-top:20px;text-align:right}
 
-button {
-  width:100%;
-  padding:12px;
-  margin-top:10px;
-  font-weight:bold;
-  cursor:pointer;
-}
+.title{font-size:32px;font-weight:bold;margin-top:20px}
+.desc{margin-top:10px}
 
-/* DISPLAY */
-.display {
-  width:794px;
-  min-height:1123px;
-  background:white;
-  margin:30px auto;
-  padding:50px;
-  box-sizing:border-box;
-}
+.section-title{margin-top:20px;font-weight:bold;color:#666}
 
-.top {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  direction:ltr;
-}
-
-.logo {
-  font-weight:bold;
-  letter-spacing:1.5px;
-  color:#666;
-}
-
-.kosher {
-  font-weight:bold;
-}
-
-.kosher-meat { color:#d92d20; }
-.kosher-dairy { color:#175cd3; }
-.kosher-parve { color:#027a48; }
-
-.category {
-  display:inline-block;
-  margin-top:10px;
-  background:#f2f4f7;
-  padding:6px 14px;
-  border-radius:16px;
-  font-weight:bold;
-}
-
-.price {
-  text-align:right;
-  font-size:28px;
-  font-weight:bold;
-  margin-top:20px;
-}
-
-.title {
-  font-size:34px;
-  font-weight:900;
-  margin-top:20px;
-}
-
-.desc {
-  font-size:18px;
-  margin-top:10px;
-}
-
-.section-title {
-  margin-top:20px;
-  font-size:12px;
-  font-weight:bold;
-  letter-spacing:1px;
-  color:#777;
-}
-
-.ingredients {
-  font-size:14px;
-  margin-top:8px;
-}
-
-.allergens-box {
-  margin-top:20px;
-  border:1px solid #ddd;
-  border-radius:16px;
-  padding:12px;
-}
-
-.allergens-grid {
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:8px;
-}
-
-.allergen {
-  padding:6px;
-  border-radius:10px;
-  background:#f5f5f5;
-  text-align:center;
-  font-weight:bold;
-  font-size:13px;
-}
-
-@media print {
-  .app { display:none; }
-  body { background:white; }
-}
+.allergens{border:1px solid #ccc;padding:10px;margin-top:20px;border-radius:10px}
 </style>
 </head>
 
@@ -143,11 +52,24 @@ button {
 
 <div class="app">
 
-<h3>הדבק טקסט</h3>
 <textarea id="raw"></textarea>
 <button onclick="runExtract()">Extract</button>
 
+<input id="dishNameEn" placeholder="English name">
+<input id="dishNameHe" placeholder="שם בעברית">
+
+<textarea id="descEn" placeholder="Description EN"></textarea>
+<textarea id="descHe" placeholder="תיאור"></textarea>
+
+<textarea id="ingredientsEn" placeholder="Ingredients EN"></textarea>
+<textarea id="ingredientsHe" placeholder="רכיבים"></textarea>
+
+<textarea id="allergensEn" placeholder="Allergens EN"></textarea>
+<textarea id="allergensHe" placeholder="אלרגנים"></textarea>
+
 <input id="price" placeholder="מחיר">
+<input id="station" placeholder="קטגוריה">
+<input id="kosher" placeholder="כשרות">
 
 <button onclick="createDisplay()">Create</button>
 <button onclick="window.print()">PDF</button>
@@ -157,31 +79,31 @@ button {
 <div class="display">
 
 <div class="top">
-  <div class="logo">CAFFÈ MACS</div>
-  <div class="kosher" id="kosherOut"></div>
+<div class="logo">CAFFÈ MACS</div>
+<div id="kosherOut"></div>
 </div>
 
-<div class="category" id="categoryOut"></div>
+<div id="categoryOut" class="category"></div>
 
-<div class="price" id="priceOut"></div>
+<div id="priceOut" class="price"></div>
 
-<div class="title" id="nameEnOut"></div>
-<div class="desc" id="descEnOut"></div>
+<div id="nameEnOut" class="title"></div>
+<div id="descEnOut" class="desc"></div>
 
-<div class="section-title">INGREDIENTS</div>
-<div class="ingredients" id="ingEnOut"></div>
+<div class="section-title">Ingredients</div>
+<div id="ingEnOut"></div>
 
 <hr>
 
-<div class="title" id="nameHeOut"></div>
-<div class="desc" id="descHeOut"></div>
+<div id="nameHeOut" class="title"></div>
+<div id="descHeOut" class="desc"></div>
 
 <div class="section-title">רכיבים</div>
-<div class="ingredients" id="ingHeOut"></div>
+<div id="ingHeOut"></div>
 
-<div class="allergens-box">
-  <div class="section-title">ALLERGENS / אלרגנים</div>
-  <div class="allergens-grid" id="allergensOut"></div>
+<div class="allergens">
+<div class="section-title">Allergens</div>
+<div id="allergensOut"></div>
 </div>
 
 </div>
@@ -190,74 +112,62 @@ button {
 function safe(v){return v||""}
 
 function splitCategory(cat){
-  let station = cat;
-  let kosher = "";
+let station=cat
+let kosher=""
 
-  if(cat.includes("Meat")) { kosher="בשרי"; station=cat.replace("(Meat)","").trim(); }
-  if(cat.includes("Dairy")) { kosher="חלבי"; station=cat.replace("(Dairy)","").trim(); }
-  if(cat.includes("Parve")) { kosher="פרווה"; station=cat.replace("(Parve)","").trim(); }
+if(cat.includes("Meat")){kosher="בשרי";station=cat.replace("(Meat)","")}
+if(cat.includes("Dairy")){kosher="חלבי";station=cat.replace("(Dairy)","")}
+if(cat.includes("Parve")){kosher="פרווה";station=cat.replace("(Parve)","")}
 
-  return {station,kosher};
+return{station,kosher}
 }
 
 async function runExtract(){
-  const res = await fetch("/extract",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({text:raw.value})
-  });
+const res=await fetch("/extract",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({text:raw.value})
+})
 
-  const d = await res.json();
+const d=await res.json()
 
-  const cat = splitCategory(safe(d.category));
+const cat=splitCategory(safe(d.category))
 
-  window.dataStore = {
-    nameEn:d.dish_name_en,
-    nameHe:d.dish_name_he,
-    descEn:d.description_en,
-    descHe:d.description_he,
-    ingEn:d.ingredients_en,
-    ingHe:d.ingredients_he,
-    allEn:d.allergens_en,
-    allHe:d.allergens_he,
-    station:cat.station,
-    kosher:cat.kosher
-  }
+dishNameEn.value=safe(d.dish_name_en)
+dishNameHe.value=safe(d.dish_name_he)
+descEn.value=safe(d.description_en)
+descHe.value=safe(d.description_he)
+ingredientsEn.value=safe(d.ingredients_en)
+ingredientsHe.value=safe(d.ingredients_he)
+allergensEn.value=safe(d.allergens_en)
+allergensHe.value=safe(d.allergens_he)
+station.value=cat.station
+kosher.value=cat.kosher
+
+createDisplay()
 }
 
 function createDisplay(){
 
-const d = window.dataStore || {}
+priceOut.innerText=price.value? "₪"+price.value:""
 
-priceOut.innerText = price.value ? "₪"+price.value+".00":""
+categoryOut.innerText=station.value
 
-categoryOut.innerText = d.station
+kosherOut.innerText=kosher.value
+kosherOut.className=""
 
-kosherOut.innerText = d.kosher
-kosherOut.className="kosher"
+if(kosher.value=="בשרי")kosherOut.className="kosher-meat"
+if(kosher.value=="חלבי")kosherOut.className="kosher-dairy"
+if(kosher.value=="פרווה")kosherOut.className="kosher-parve"
 
-if(d.kosher==="בשרי") kosherOut.classList.add("kosher-meat")
-if(d.kosher==="חלבי") kosherOut.classList.add("kosher-dairy")
-if(d.kosher==="פרווה") kosherOut.classList.add("kosher-parve")
+nameEnOut.innerText=dishNameEn.value
+nameHeOut.innerText=dishNameHe.value
+descEnOut.innerText=descEn.value
+descHeOut.innerText=descHe.value
+ingEnOut.innerText=ingredientsEn.value
+ingHeOut.innerText=ingredientsHe.value
 
-nameEnOut.innerText = d.nameEn
-nameHeOut.innerText = d.nameHe
-descEnOut.innerText = d.descEn
-descHeOut.innerText = d.descHe
-ingEnOut.innerText = d.ingEn
-ingHeOut.innerText = d.ingHe
-
-allergensOut.innerHTML=""
-const en = d.allEn?.split(",")||[]
-const he = d.allHe?.split(",")||[]
-
-for(let i=0;i<Math.max(en.length,he.length);i++){
-  const div=document.createElement("div")
-  div.className="allergen"
-  div.innerText=(en[i]||"")+" "+(he[i]||"")
-  allergensOut.appendChild(div)
-}
-
+allergensOut.innerText=allergensEn.value+" / "+allergensHe.value
 }
 </script>
 
