@@ -29,11 +29,6 @@ textarea, input {
   padding:10px;
   margin-top:8px;
   border:1px solid #c7c7cc;
-  font-family: Arial;
-}
-
-textarea {
-  min-height:70px;
 }
 
 button {
@@ -50,7 +45,7 @@ button {
   gap:10px;
 }
 
-/* FINAL A4 DISPLAY */
+/* DISPLAY */
 .display-page {
   width:794px;
   height:1123px;
@@ -65,10 +60,10 @@ button {
   justify-content:space-between;
   align-items:center;
   margin-bottom:28px;
+  direction:ltr;
 }
 
 .logo {
-  font-size:16px;
   font-weight:800;
   letter-spacing:1.5px;
   color:#6e6e73;
@@ -85,7 +80,24 @@ button {
   padding:7px 16px;
   font-size:14px;
   font-weight:700;
-  color:#5f6368;
+}
+
+.kosher-meat {
+  color:#b42318;
+  border-color:#f0b8b3;
+  background:#fff5f5;
+}
+
+.kosher-dairy {
+  color:#175cd3;
+  border-color:#b2ccff;
+  background:#eff8ff;
+}
+
+.kosher-parve {
+  color:#027a48;
+  border-color:#abefc6;
+  background:#ecfdf3;
 }
 
 .price-box {
@@ -94,15 +106,7 @@ button {
   padding:18px;
   display:flex;
   justify-content:space-between;
-  align-items:center;
   margin-bottom:26px;
-}
-
-.price-label {
-  font-size:13px;
-  font-weight:800;
-  color:#6e6e73;
-  letter-spacing:1.5px;
 }
 
 .price-value {
@@ -110,85 +114,41 @@ button {
   font-weight:900;
 }
 
-hr {
-  border:0;
-  border-top:1px solid #d2d2d7;
-  margin:24px 0;
-}
+.en { direction:ltr; text-align:left; }
+.he { direction:rtl; text-align:right; }
 
-.en {
-  direction:ltr;
-  text-align:left;
-}
-
-.he {
-  direction:rtl;
-  text-align:right;
-}
-
-.title {
-  font-size:34px;
-  line-height:1.05;
-  font-weight:900;
-  margin-bottom:10px;
-}
-
-.desc {
-  font-size:20px;
-  line-height:1.35;
-  margin-bottom:14px;
-}
+.title { font-size:34px; font-weight:900; }
+.desc { font-size:20px; margin:10px 0; }
 
 .section-title {
   font-size:13px;
   font-weight:900;
-  letter-spacing:1.6px;
+  letter-spacing:1.5px;
   color:#6e6e73;
-  text-transform:uppercase;
-  margin-bottom:8px;
+  margin-top:20px;
 }
 
 .ingredients {
   font-size:14px;
-  line-height:1.35;
   color:#4a4a4a;
 }
 
 .allergen-grid {
   display:grid;
-  grid-template-columns:repeat(4, 1fr);
+  grid-template-columns:repeat(4,1fr);
   gap:8px;
 }
 
 .allergen-pill {
   border:1px solid #d2d2d7;
   border-radius:18px;
-  padding:7px 10px;
+  padding:7px;
   text-align:center;
-  font-size:13px;
-  font-weight:800;
+  font-weight:bold;
 }
 
 @media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
-  body {
-    background:white;
-  }
-
-  .app {
-    display:none;
-  }
-
-  .display-page {
-    margin:0;
-    width:794px;
-    height:1123px;
-    padding:46px;
-  }
+  .app { display:none; }
 }
 </style>
 </head>
@@ -196,163 +156,118 @@ hr {
 <body>
 
 <div class="app">
-  <h1>Menu Display AI</h1>
 
-  <div class="box">
-    <h2>אפשרות 1 - הדבק תוכן מלא מה-PDF</h2>
-    <textarea id="raw" placeholder="הדבק כאן את כל הטקסט מה-PDF"></textarea>
-    <button onclick="runExtract()">Extract Fields</button>
-  </div>
+<h2>הדבק טקסט</h2>
+<textarea id="raw"></textarea>
+<button onclick="runExtract()">Extract</button>
 
-  <div class="box">
-    <h2>אפשרות 2 - הזנה ידנית / עריכה לפני יצירת Display</h2>
+<div class="grid">
+<input id="dishNameEn" placeholder="English name">
+<input id="dishNameHe" placeholder="שם בעברית">
 
-    <div class="grid">
-      <input id="dishNameEn" placeholder="Dish name - English">
-      <input id="dishNameHe" placeholder="שם מנה - עברית">
+<textarea id="descEn" placeholder="Description EN"></textarea>
+<textarea id="descHe" placeholder="תיאור"></textarea>
 
-      <textarea id="descEn" placeholder="Description - English"></textarea>
-      <textarea id="descHe" placeholder="תיאור מנה - עברית"></textarea>
+<textarea id="ingredientsEn" placeholder="Ingredients EN"></textarea>
+<textarea id="ingredientsHe" placeholder="רכיבים"></textarea>
 
-      <textarea id="ingredientsEn" placeholder="Ingredients - English"></textarea>
-      <textarea id="ingredientsHe" placeholder="רכיבים - עברית"></textarea>
+<textarea id="allergensEn" placeholder="Allergens EN"></textarea>
+<textarea id="allergensHe" placeholder="אלרגנים"></textarea>
 
-      <textarea id="allergensEn" placeholder="Allergens - English"></textarea>
-      <textarea id="allergensHe" placeholder="אלרגנים - עברית"></textarea>
-
-      <input id="price" placeholder="מחיר">
-      <input id="kosher" placeholder="כשרות / קטגוריה">
-    </div>
-
-    <button onclick="createDisplay()">Create Display</button>
-    <button onclick="generatePDF()">Generate PDF / Print</button>
-  </div>
+<input id="price" placeholder="מחיר">
+<input id="station" placeholder="Sandwich / Grill / Sushi">
+<input id="kosher" placeholder="בשרי / חלבי / פרווה">
 </div>
 
-<div class="display-page" id="finalDisplay">
+<button onclick="createDisplay()">Create</button>
+<button onclick="window.print()">PDF</button>
 
-  <div class="top-row">
-    <div class="logo">CAFFÈ MACS</div>
-    <div class="tags">
-      <div class="tag" id="tagCategory"></div>
-      <div class="tag" id="tagCategoryHe"></div>
-      <div class="tag" id="tagKosher"></div>
-    </div>
-  </div>
+</div>
 
-  <div class="price-box">
-    <div class="price-label">DISH PRICE / מחיר מנה</div>
-    <div class="price-value" id="priceOut"></div>
-  </div>
+<div class="display-page">
 
-  <hr>
+<div class="top-row">
+<div class="logo">CAFFÈ MACS</div>
 
-  <div class="en">
-    <div class="title" id="nameEnOut"></div>
-    <div class="desc" id="descEnOut"></div>
+<div class="tags">
+<div class="tag" id="tagStation"></div>
+<div class="tag" id="tagKosher"></div>
+</div>
+</div>
 
-    <div class="section-title">Ingredients</div>
-    <div class="ingredients" id="ingEnOut"></div>
-  </div>
+<div class="price-box">
+<div>DISH PRICE / מחיר מנה</div>
+<div class="price-value" id="priceOut"></div>
+</div>
 
-  <hr>
+<div class="en">
+<div class="title" id="nameEnOut"></div>
+<div class="desc" id="descEnOut"></div>
+<div class="section-title">Ingredients</div>
+<div class="ingredients" id="ingEnOut"></div>
+</div>
 
-  <div class="he">
-    <div class="title" id="nameHeOut"></div>
-    <div class="desc" id="descHeOut"></div>
+<div class="he">
+<div class="title" id="nameHeOut"></div>
+<div class="desc" id="descHeOut"></div>
+<div class="section-title">רכיבים</div>
+<div class="ingredients" id="ingHeOut"></div>
+</div>
 
-    <div class="section-title">רכיבים</div>
-    <div class="ingredients" id="ingHeOut"></div>
-  </div>
-
-  <hr>
-
-  <div>
-    <div class="section-title">Allergens / אלרגנים</div>
-    <div class="allergen-grid" id="allergensOut"></div>
-  </div>
+<div class="section-title">Allergens / אלרגנים</div>
+<div class="allergen-grid" id="allergensOut"></div>
 
 </div>
 
 <script>
-function safe(value) {
-  return value || "";
-}
+function safe(v){return v||""}
 
-function formatPrice(value) {
-  if (!value) return "";
-  value = value.replace("₪", "").trim();
-  return "₪" + value + ".00";
-}
-
-async function runExtract() {
-  const res = await fetch("/extract", {
+async function runExtract(){
+  const res = await fetch("/extract",{
     method:"POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      text: document.getElementById("raw").value
-    })
-  });
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text:raw.value})
+  })
+  const d = await res.json()
 
-  const data = await res.json();
-
-  if (data.error) {
-    alert("Error: " + data.error);
-    return;
-  }
-
-  document.getElementById("dishNameEn").value = safe(data.dish_name_en);
-  document.getElementById("dishNameHe").value = safe(data.dish_name_he);
-  document.getElementById("descEn").value = safe(data.description_en);
-  document.getElementById("descHe").value = safe(data.description_he);
-  document.getElementById("ingredientsEn").value = safe(data.ingredients_en);
-  document.getElementById("ingredientsHe").value = safe(data.ingredients_he);
-  document.getElementById("allergensEn").value = safe(data.allergens_en);
-  document.getElementById("allergensHe").value = safe(data.allergens_he);
-  document.getElementById("kosher").value = safe(data.category);
-
-  createDisplay();
+  dishNameEn.value = safe(d.dish_name_en)
+  dishNameHe.value = safe(d.dish_name_he)
+  descEn.value = safe(d.description_en)
+  descHe.value = safe(d.description_he)
+  ingredientsEn.value = safe(d.ingredients_en)
+  ingredientsHe.value = safe(d.ingredients_he)
+  allergensEn.value = safe(d.allergens_en)
+  allergensHe.value = safe(d.allergens_he)
 }
 
-function createDisplay() {
-  const price = document.getElementById("price").value;
-  const kosher = document.getElementById("kosher").value;
+function createDisplay(){
 
-  document.getElementById("priceOut").innerText = formatPrice(price);
+priceOut.innerText = price.value ? "₪"+price.value+".00":""
 
-  document.getElementById("tagCategory").innerText = kosher || "";
-  document.getElementById("tagCategoryHe").innerText = kosher || "";
-  document.getElementById("tagKosher").innerText = kosher || "";
+tagStation.innerText = station.value
+tagKosher.innerText = kosher.value
 
-  document.getElementById("nameEnOut").innerText = document.getElementById("dishNameEn").value;
-  document.getElementById("nameHeOut").innerText = document.getElementById("dishNameHe").value;
+tagKosher.className = "tag"
 
-  document.getElementById("descEnOut").innerText = document.getElementById("descEn").value;
-  document.getElementById("descHeOut").innerText = document.getElementById("descHe").value;
+if(kosher.value.includes("בשר")) tagKosher.classList.add("kosher-meat")
+if(kosher.value.includes("חלב")) tagKosher.classList.add("kosher-dairy")
+if(kosher.value.includes("פרווה")) tagKosher.classList.add("kosher-parve")
 
-  document.getElementById("ingEnOut").innerText = document.getElementById("ingredientsEn").value;
-  document.getElementById("ingHeOut").innerText = document.getElementById("ingredientsHe").value;
+nameEnOut.innerText = dishNameEn.value
+nameHeOut.innerText = dishNameHe.value
+descEnOut.innerText = descEn.value
+descHeOut.innerText = descHe.value
+ingEnOut.innerText = ingredientsEn.value
+ingHeOut.innerText = ingredientsHe.value
 
-  const allEn = document.getElementById("allergensEn").value.split(",").map(x => x.trim()).filter(Boolean);
-  const allHe = document.getElementById("allergensHe").value.split(",").map(x => x.trim()).filter(Boolean);
+allergensOut.innerHTML=""
+allergensEn.value.split(",").forEach((a,i)=>{
+  const div=document.createElement("div")
+  div.className="allergen-pill"
+  div.innerText=a.trim()+" / "+(allergensHe.value.split(",")[i]||"")
+  allergensOut.appendChild(div)
+})
 
-  const max = Math.max(allEn.length, allHe.length);
-  const box = document.getElementById("allergensOut");
-  box.innerHTML = "";
-
-  for (let i = 0; i < max; i++) {
-    const pill = document.createElement("div");
-    pill.className = "allergen-pill";
-    pill.innerText = safe(allEn[i]) + (allHe[i] ? " / " + allHe[i] : "");
-    box.appendChild(pill);
-  }
-
-  document.getElementById("finalDisplay").scrollIntoView({behavior:"smooth"});
-}
-
-function generatePDF() {
-  createDisplay();
-  setTimeout(() => window.print(), 300);
 }
 </script>
 
