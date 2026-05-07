@@ -2,160 +2,357 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>Menu AI</title>
+<title>Menu Display AI</title>
 
 <style>
-body {font-family: Arial; background:#f5f5f5; padding:20px;}
-textarea {width:100%; min-height:90px; padding:10px; box-sizing:border-box;}
-input {width:100%; padding:10px; margin-top:8px; box-sizing:border-box;}
-button {padding:12px; margin-top:10px; width:100%; cursor:pointer;}
-h2 {margin-top:30px;}
+body {
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  background:#f3f3f3;
+  color:#1d1d1f;
+}
+
+.app {
+  padding:20px;
+}
 
 .box {
-    background:white;
-    padding:24px;
-    margin-top:20px;
-    border-radius:20px;
+  background:white;
+  padding:22px;
+  margin-bottom:18px;
+  border-radius:18px;
+}
+
+textarea, input {
+  width:100%;
+  box-sizing:border-box;
+  padding:10px;
+  margin-top:8px;
+  border:1px solid #c7c7cc;
+  font-family: Arial;
+}
+
+textarea {
+  min-height:70px;
+}
+
+button {
+  width:100%;
+  padding:13px;
+  margin-top:12px;
+  font-weight:bold;
+  cursor:pointer;
 }
 
 .grid {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
 }
 
-.full {grid-column:1 / -1;}
+/* FINAL A4 DISPLAY */
+.display-page {
+  width:794px;
+  height:1123px;
+  background:white;
+  margin:30px auto;
+  padding:46px;
+  box-sizing:border-box;
+}
 
-.display {
+.top-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:28px;
+}
+
+.logo {
+  font-size:16px;
+  font-weight:800;
+  letter-spacing:1.5px;
+  color:#6e6e73;
+}
+
+.tags {
+  display:flex;
+  gap:10px;
+}
+
+.tag {
+  border:1px solid #d2d2d7;
+  border-radius:20px;
+  padding:7px 16px;
+  font-size:14px;
+  font-weight:700;
+  color:#5f6368;
+}
+
+.price-box {
+  border:1px solid #d2d2d7;
+  border-radius:18px;
+  padding:18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:26px;
+}
+
+.price-label {
+  font-size:13px;
+  font-weight:800;
+  color:#6e6e73;
+  letter-spacing:1.5px;
+}
+
+.price-value {
+  font-size:30px;
+  font-weight:900;
+}
+
+hr {
+  border:0;
+  border-top:1px solid #d2d2d7;
+  margin:24px 0;
+}
+
+.en {
+  direction:ltr;
+  text-align:left;
+}
+
+.he {
+  direction:rtl;
+  text-align:right;
+}
+
+.title {
+  font-size:34px;
+  line-height:1.05;
+  font-weight:900;
+  margin-bottom:10px;
+}
+
+.desc {
+  font-size:20px;
+  line-height:1.35;
+  margin-bottom:14px;
+}
+
+.section-title {
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:1.6px;
+  color:#6e6e73;
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+
+.ingredients {
+  font-size:14px;
+  line-height:1.35;
+  color:#4a4a4a;
+}
+
+.allergen-grid {
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:8px;
+}
+
+.allergen-pill {
+  border:1px solid #d2d2d7;
+  border-radius:18px;
+  padding:7px 10px;
+  text-align:center;
+  font-size:13px;
+  font-weight:800;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
     background:white;
-    padding:30px;
-    margin-top:25px;
-    border-radius:20px;
-    min-height:250px;
-}
+  }
 
-.title {font-size:32px; font-weight:bold;}
-.desc {margin-top:10px; font-size:18px;}
-.section {margin-top:22px;}
-.price {font-size:28px; font-weight:bold; margin-bottom:20px;}
-.small-title {font-weight:bold; margin-bottom:6px;}
+  .app {
+    display:none;
+  }
+
+  .display-page {
+    margin:0;
+    width:794px;
+    height:1123px;
+    padding:46px;
+  }
+}
 </style>
 </head>
 
 <body>
 
-<h1>Menu Display AI</h1>
+<div class="app">
+  <h1>Menu Display AI</h1>
 
-<div class="box">
+  <div class="box">
     <h2>אפשרות 1 - הדבק תוכן מלא מה-PDF</h2>
     <textarea id="raw" placeholder="הדבק כאן את כל הטקסט מה-PDF"></textarea>
     <button onclick="runExtract()">Extract Fields</button>
-</div>
+  </div>
 
-<div class="box">
+  <div class="box">
     <h2>אפשרות 2 - הזנה ידנית / עריכה לפני יצירת Display</h2>
 
     <div class="grid">
-        <input id="dishNameEn" placeholder="Dish name - English">
-        <input id="dishNameHe" placeholder="שם מנה - עברית">
+      <input id="dishNameEn" placeholder="Dish name - English">
+      <input id="dishNameHe" placeholder="שם מנה - עברית">
 
-        <textarea id="descEn" placeholder="Description - English"></textarea>
-        <textarea id="descHe" placeholder="תיאור מנה - עברית"></textarea>
+      <textarea id="descEn" placeholder="Description - English"></textarea>
+      <textarea id="descHe" placeholder="תיאור מנה - עברית"></textarea>
 
-        <textarea id="ingredientsEn" placeholder="Ingredients - English"></textarea>
-        <textarea id="ingredientsHe" placeholder="רכיבים - עברית"></textarea>
+      <textarea id="ingredientsEn" placeholder="Ingredients - English"></textarea>
+      <textarea id="ingredientsHe" placeholder="רכיבים - עברית"></textarea>
 
-        <textarea id="allergensEn" placeholder="Allergens - English"></textarea>
-        <textarea id="allergensHe" placeholder="אלרגנים - עברית"></textarea>
+      <textarea id="allergensEn" placeholder="Allergens - English"></textarea>
+      <textarea id="allergensHe" placeholder="אלרגנים - עברית"></textarea>
 
-        <input id="price" placeholder="מחיר">
-        <input id="kosher" placeholder="כשרות / קטגוריה">
+      <input id="price" placeholder="מחיר">
+      <input id="kosher" placeholder="כשרות / קטגוריה">
     </div>
 
     <button onclick="createDisplay()">Create Display</button>
+    <button onclick="generatePDF()">Generate PDF / Print</button>
+  </div>
 </div>
 
-<div class="display">
-    <div class="price" id="priceOut"></div>
+<div class="display-page" id="finalDisplay">
 
+  <div class="top-row">
+    <div class="logo">CAFFÈ MACS</div>
+    <div class="tags">
+      <div class="tag" id="tagCategory"></div>
+      <div class="tag" id="tagCategoryHe"></div>
+      <div class="tag" id="tagKosher"></div>
+    </div>
+  </div>
+
+  <div class="price-box">
+    <div class="price-label">DISH PRICE / מחיר מנה</div>
+    <div class="price-value" id="priceOut"></div>
+  </div>
+
+  <hr>
+
+  <div class="en">
     <div class="title" id="nameEnOut"></div>
-    <div class="title" id="nameHeOut"></div>
-
     <div class="desc" id="descEnOut"></div>
+
+    <div class="section-title">Ingredients</div>
+    <div class="ingredients" id="ingEnOut"></div>
+  </div>
+
+  <hr>
+
+  <div class="he">
+    <div class="title" id="nameHeOut"></div>
     <div class="desc" id="descHeOut"></div>
 
-    <div class="section">
-        <div class="small-title">Ingredients</div>
-        <div id="ingEnOut"></div>
-        <div id="ingHeOut"></div>
-    </div>
+    <div class="section-title">רכיבים</div>
+    <div class="ingredients" id="ingHeOut"></div>
+  </div>
 
-    <div class="section">
-        <div class="small-title">אלרגנים / Allergens</div>
-        <div id="allHeOut"></div>
-        <div id="allEnOut"></div>
-    </div>
+  <hr>
 
-    <div class="section">
-        <div class="small-title">כשרות / Category</div>
-        <div id="kosherOut"></div>
-    </div>
+  <div>
+    <div class="section-title">Allergens / אלרגנים</div>
+    <div class="allergen-grid" id="allergensOut"></div>
+  </div>
+
 </div>
 
 <script>
 function safe(value) {
-    return value || "";
+  return value || "";
+}
+
+function formatPrice(value) {
+  if (!value) return "";
+  value = value.replace("₪", "").trim();
+  return "₪" + value + ".00";
 }
 
 async function runExtract() {
-    const res = await fetch("/extract", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-            text: document.getElementById("raw").value
-        })
-    });
+  const res = await fetch("/extract", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      text: document.getElementById("raw").value
+    })
+  });
 
-    const data = await res.json();
+  const data = await res.json();
 
-    if (data.error) {
-        alert("Error: " + data.error);
-        return;
-    }
+  if (data.error) {
+    alert("Error: " + data.error);
+    return;
+  }
 
-    document.getElementById("dishNameEn").value = safe(data.dish_name_en);
-    document.getElementById("dishNameHe").value = safe(data.dish_name_he);
+  document.getElementById("dishNameEn").value = safe(data.dish_name_en);
+  document.getElementById("dishNameHe").value = safe(data.dish_name_he);
+  document.getElementById("descEn").value = safe(data.description_en);
+  document.getElementById("descHe").value = safe(data.description_he);
+  document.getElementById("ingredientsEn").value = safe(data.ingredients_en);
+  document.getElementById("ingredientsHe").value = safe(data.ingredients_he);
+  document.getElementById("allergensEn").value = safe(data.allergens_en);
+  document.getElementById("allergensHe").value = safe(data.allergens_he);
+  document.getElementById("kosher").value = safe(data.category);
 
-    document.getElementById("descEn").value = safe(data.description_en);
-    document.getElementById("descHe").value = safe(data.description_he);
-
-    document.getElementById("ingredientsEn").value = safe(data.ingredients_en);
-    document.getElementById("ingredientsHe").value = safe(data.ingredients_he);
-
-    document.getElementById("allergensEn").value = safe(data.allergens_en);
-    document.getElementById("allergensHe").value = safe(data.allergens_he);
-
-    document.getElementById("kosher").value = safe(data.category);
-
-    createDisplay();
+  createDisplay();
 }
 
 function createDisplay() {
-    document.getElementById("priceOut").innerText = document.getElementById("price").value ? "₪" + document.getElementById("price").value : "";
+  const price = document.getElementById("price").value;
+  const kosher = document.getElementById("kosher").value;
 
-    document.getElementById("nameEnOut").innerText = document.getElementById("dishNameEn").value;
-    document.getElementById("nameHeOut").innerText = document.getElementById("dishNameHe").value;
+  document.getElementById("priceOut").innerText = formatPrice(price);
 
-    document.getElementById("descEnOut").innerText = document.getElementById("descEn").value;
-    document.getElementById("descHeOut").innerText = document.getElementById("descHe").value;
+  document.getElementById("tagCategory").innerText = kosher || "";
+  document.getElementById("tagCategoryHe").innerText = kosher || "";
+  document.getElementById("tagKosher").innerText = kosher || "";
 
-    document.getElementById("ingEnOut").innerText = document.getElementById("ingredientsEn").value;
-    document.getElementById("ingHeOut").innerText = document.getElementById("ingredientsHe").value;
+  document.getElementById("nameEnOut").innerText = document.getElementById("dishNameEn").value;
+  document.getElementById("nameHeOut").innerText = document.getElementById("dishNameHe").value;
 
-    document.getElementById("allEnOut").innerText = document.getElementById("allergensEn").value;
-    document.getElementById("allHeOut").innerText = document.getElementById("allergensHe").value;
+  document.getElementById("descEnOut").innerText = document.getElementById("descEn").value;
+  document.getElementById("descHeOut").innerText = document.getElementById("descHe").value;
 
-    document.getElementById("kosherOut").innerText = document.getElementById("kosher").value;
+  document.getElementById("ingEnOut").innerText = document.getElementById("ingredientsEn").value;
+  document.getElementById("ingHeOut").innerText = document.getElementById("ingredientsHe").value;
+
+  const allEn = document.getElementById("allergensEn").value.split(",").map(x => x.trim()).filter(Boolean);
+  const allHe = document.getElementById("allergensHe").value.split(",").map(x => x.trim()).filter(Boolean);
+
+  const max = Math.max(allEn.length, allHe.length);
+  const box = document.getElementById("allergensOut");
+  box.innerHTML = "";
+
+  for (let i = 0; i < max; i++) {
+    const pill = document.createElement("div");
+    pill.className = "allergen-pill";
+    pill.innerText = safe(allEn[i]) + (allHe[i] ? " / " + allHe[i] : "");
+    box.appendChild(pill);
+  }
+
+  document.getElementById("finalDisplay").scrollIntoView({behavior:"smooth"});
+}
+
+function generatePDF() {
+  createDisplay();
+  setTimeout(() => window.print(), 300);
 }
 </script>
 
