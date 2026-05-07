@@ -6,58 +6,108 @@
 
 <style>
 body {font-family: Arial; background:#f5f5f5; padding:20px;}
-textarea {width:100%; height:150px; padding:10px;}
-input {width:100%; padding:10px; margin-top:10px;}
-button {padding:12px; margin-top:10px; width:100%;}
+textarea {width:100%; min-height:90px; padding:10px; box-sizing:border-box;}
+input {width:100%; padding:10px; margin-top:8px; box-sizing:border-box;}
+button {padding:12px; margin-top:10px; width:100%; cursor:pointer;}
+h2 {margin-top:30px;}
 
-.display {
+.box {
     background:white;
-    padding:30px;
+    padding:24px;
     margin-top:20px;
     border-radius:20px;
 }
 
-.title {font-size:32px; font-weight:bold;}
-.desc {margin-top:10px;}
-.section {margin-top:20px;}
-.price {font-size:28px; font-weight:bold;}
-</style>
+.grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+}
 
+.full {grid-column:1 / -1;}
+
+.display {
+    background:white;
+    padding:30px;
+    margin-top:25px;
+    border-radius:20px;
+    min-height:250px;
+}
+
+.title {font-size:32px; font-weight:bold;}
+.desc {margin-top:10px; font-size:18px;}
+.section {margin-top:22px;}
+.price {font-size:28px; font-weight:bold; margin-bottom:20px;}
+.small-title {font-weight:bold; margin-bottom:6px;}
+</style>
 </head>
+
 <body>
 
-<h2>הדבק תוכן מה-PDF</h2>
+<h1>Menu Display AI</h1>
 
-<textarea id="raw"></textarea>
+<div class="box">
+    <h2>אפשרות 1 - הדבק תוכן מלא מה-PDF</h2>
+    <textarea id="raw" placeholder="הדבק כאן את כל הטקסט מה-PDF"></textarea>
+    <button onclick="runExtract()">Extract Fields</button>
+</div>
 
-<input id="price" placeholder="מחיר ידני">
+<div class="box">
+    <h2>אפשרות 2 - הזנה ידנית / עריכה לפני יצירת Display</h2>
 
-<button onclick="run()">Extract & Create Display</button>
+    <div class="grid">
+        <input id="dishNameEn" placeholder="Dish name - English">
+        <input id="dishNameHe" placeholder="שם מנה - עברית">
+
+        <textarea id="descEn" placeholder="Description - English"></textarea>
+        <textarea id="descHe" placeholder="תיאור מנה - עברית"></textarea>
+
+        <textarea id="ingredientsEn" placeholder="Ingredients - English"></textarea>
+        <textarea id="ingredientsHe" placeholder="רכיבים - עברית"></textarea>
+
+        <textarea id="allergensEn" placeholder="Allergens - English"></textarea>
+        <textarea id="allergensHe" placeholder="אלרגנים - עברית"></textarea>
+
+        <input id="price" placeholder="מחיר">
+        <input id="kosher" placeholder="כשרות / קטגוריה">
+    </div>
+
+    <button onclick="createDisplay()">Create Display</button>
+</div>
 
 <div class="display">
     <div class="price" id="priceOut"></div>
-    <div class="title" id="nameEn"></div>
-    <div class="title" id="nameHe"></div>
 
-    <div class="desc" id="descEn"></div>
-    <div class="desc" id="descHe"></div>
+    <div class="title" id="nameEnOut"></div>
+    <div class="title" id="nameHeOut"></div>
+
+    <div class="desc" id="descEnOut"></div>
+    <div class="desc" id="descHeOut"></div>
 
     <div class="section">
-        <b>Ingredients</b>
-        <div id="ingEn"></div>
-        <div id="ingHe"></div>
+        <div class="small-title">Ingredients</div>
+        <div id="ingEnOut"></div>
+        <div id="ingHeOut"></div>
     </div>
 
     <div class="section">
-        <b>אלרגנים / Allergens</b>
-        <div id="allHe"></div>
-        <div id="allEn"></div>
+        <div class="small-title">אלרגנים / Allergens</div>
+        <div id="allHeOut"></div>
+        <div id="allEnOut"></div>
+    </div>
+
+    <div class="section">
+        <div class="small-title">כשרות / Category</div>
+        <div id="kosherOut"></div>
     </div>
 </div>
 
 <script>
-async function run() {
+function safe(value) {
+    return value || "";
+}
 
+async function runExtract() {
     const res = await fetch("/extract", {
         method:"POST",
         headers: {"Content-Type":"application/json"},
@@ -68,19 +118,44 @@ async function run() {
 
     const data = await res.json();
 
-    document.getElementById("priceOut").innerText = document.getElementById("price").value;
+    if (data.error) {
+        alert("Error: " + data.error);
+        return;
+    }
 
-    document.getElementById("nameEn").innerText = data.dish_name_en;
-    document.getElementById("nameHe").innerText = data.dish_name_he;
+    document.getElementById("dishNameEn").value = safe(data.dish_name_en);
+    document.getElementById("dishNameHe").value = safe(data.dish_name_he);
 
-    document.getElementById("descEn").innerText = data.description_en;
-    document.getElementById("descHe").innerText = data.description_he;
+    document.getElementById("descEn").value = safe(data.description_en);
+    document.getElementById("descHe").value = safe(data.description_he);
 
-    document.getElementById("ingEn").innerText = data.ingredients_en;
-    document.getElementById("ingHe").innerText = data.ingredients_he;
+    document.getElementById("ingredientsEn").value = safe(data.ingredients_en);
+    document.getElementById("ingredientsHe").value = safe(data.ingredients_he);
 
-    document.getElementById("allEn").innerText = data.allergens_en;
-    document.getElementById("allHe").innerText = data.allergens_he;
+    document.getElementById("allergensEn").value = safe(data.allergens_en);
+    document.getElementById("allergensHe").value = safe(data.allergens_he);
+
+    document.getElementById("kosher").value = safe(data.category);
+
+    createDisplay();
+}
+
+function createDisplay() {
+    document.getElementById("priceOut").innerText = document.getElementById("price").value ? "₪" + document.getElementById("price").value : "";
+
+    document.getElementById("nameEnOut").innerText = document.getElementById("dishNameEn").value;
+    document.getElementById("nameHeOut").innerText = document.getElementById("dishNameHe").value;
+
+    document.getElementById("descEnOut").innerText = document.getElementById("descEn").value;
+    document.getElementById("descHeOut").innerText = document.getElementById("descHe").value;
+
+    document.getElementById("ingEnOut").innerText = document.getElementById("ingredientsEn").value;
+    document.getElementById("ingHeOut").innerText = document.getElementById("ingredientsHe").value;
+
+    document.getElementById("allEnOut").innerText = document.getElementById("allergensEn").value;
+    document.getElementById("allHeOut").innerText = document.getElementById("allergensHe").value;
+
+    document.getElementById("kosherOut").innerText = document.getElementById("kosher").value;
 }
 </script>
 
