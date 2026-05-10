@@ -1,325 +1,531 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he">
 <head>
-<meta charset="UTF-8">
-<title>Caffè Macs Generator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caffè Macs Display Generator</title>
 
-<style>
-body { margin:0; font-family:Arial; background:#ececef; }
+  <style>
+    * { box-sizing: border-box; }
 
-.container {
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:20px;
-  padding:20px;
-}
+    body {
+      margin: 0;
+      background: #ececef;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: #1d1d1f;
+      padding: 24px;
+    }
 
-/* LEFT PANEL */
-.panel {
-  background:white;
-  padding:20px;
-  border-radius:16px;
-}
+    .app {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 24px;
+      align-items: start;
+    }
 
-input, textarea, select {
-  width:100%;
-  padding:8px;
-  margin-bottom:10px;
-}
+    .left-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
 
-button {
-  padding:10px;
-  border:none;
-  border-radius:999px;
-  background:#0071e3;
-  color:white;
-  cursor:pointer;
-}
+    .panel {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+      padding: 22px;
+    }
 
-/* ====== RIGHT SIDE (לא נוגע בעיצוב שלך) ====== */
+    .panel h2 {
+      margin: 0 0 6px;
+      font-size: 21px;
+      letter-spacing: -0.02em;
+    }
 
-.page-wrap {
-  background:white;
-  border-radius:28px;
-  padding:42px;
-  position:relative;
-}
+    .panel .hint {
+      margin: 0 0 18px;
+      color: #6e6e73;
+      font-size: 14px;
+      line-height: 1.45;
+    }
 
-.top-accent {
-  position:absolute;
-  top:0;
-  left:0;
-  right:0;
-  height:10px;
-}
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 750;
+      color: #6e6e73;
+      margin: 0 0 7px;
+    }
 
-.brand-title {
-  text-align:center;
-  font-size:34px;
-  font-weight:bold;
-  margin-bottom:30px;
-}
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid #d2d2d7;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: 14px;
+      background: #ffffff;
+      margin-bottom: 14px;
+      outline: none;
+    }
 
-.header-card {
-  display:flex;
-  justify-content:space-between;
-  padding:20px;
-  background:#f8f8fa;
-  border-radius:20px;
-}
+    input:focus, textarea:focus, select:focus {
+      border-color: #0071e3;
+      box-shadow: 0 0 0 3px rgba(0,113,227,0.12);
+    }
 
-.station-he { direction:rtl; }
+    textarea {
+      min-height: 76px;
+      resize: vertical;
+      line-height: 1.45;
+    }
 
-.dish-name-he {
-  direction:rtl;
-  text-align:right;
-  font-size:28px;
-  font-weight:bold;
-}
+    .raw-textarea {
+      min-height: 185px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+    }
 
-.description.he {
-  direction:rtl;
-  text-align:right;
-}
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
 
-.ingredients.he {
-  direction:rtl;
-  text-align:right;
-}
+    button {
+      border: none;
+      border-radius: 999px;
+      background: #0071e3;
+      color: white;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 750;
+      cursor: pointer;
+    }
 
-.label.he {
-  direction:rtl;
-  text-align:right;
-}
+    button.secondary {
+      background: #e8e8ed;
+      color: #1d1d1f;
+    }
 
-.divider {
-  height:1px;
-  background:#ddd;
-  margin:30px 0;
-}
+    button.small {
+      padding: 7px 12px;
+      font-size: 12px;
+    }
 
-.allergen-card {
-  background:#fff8f8;
-  padding:15px;
-  border-radius:16px;
-}
+    .results-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
 
-.allergen-grid {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-}
+    .result-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid #eeeeF2;
+      background: #fbfbfd;
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
 
-.allergen-text.he {
-  direction:rtl;
-  text-align:right;
-}
+    .result-title {
+      font-weight: 760;
+      margin-bottom: 4px;
+    }
 
-</style>
+    .result-meta {
+      color: #6e6e73;
+      font-size: 13px;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .read-only {
+      background: #f5f5f7;
+      color: #515154;
+    }
+
+    .section-title {
+      margin: 22px 0 12px;
+      padding-top: 18px;
+      border-top: 1px solid #eeeeF2;
+      font-size: 16px;
+      font-weight: 820;
+    }
+
+    .right-preview {
+      position: sticky;
+      top: 24px;
+    }
+
+    /* ===== FINAL DISPLAY TEMPLATE ===== */
+
+    .page-wrap {
+      width: 100%;
+      min-height: 980px;
+      background: #ffffff;
+      border-radius: 28px;
+      box-shadow: 0 18px 55px rgba(0,0,0,0.14);
+      padding: 42px 48px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .top-accent {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 10px;
+      background: #d70015;
+    }
+
+    .brand-title {
+      text-align: center;
+      margin: 8px 0 28px;
+    }
+
+    .brand-title .main {
+      font-size: 34px;
+      font-weight: 860;
+      letter-spacing: -0.04em;
+    }
+
+    .header-card {
+      border: 1px solid #e5e5ea;
+      background: #f8f8fa;
+      border-radius: 24px;
+      padding: 22px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 38px;
+    }
+
+    .station-line {
+      font-size: 21px;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .station-he {
+      direction: rtl;
+      color: #515154;
+      font-weight: 680;
+    }
+
+    .meta-line {
+      margin-top: 10px;
+    }
+
+    .kosher-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #ffe5e5;
+      color: #b00020;
+      font-weight: 750;
+      font-size: 15px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      background: #d70015;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .price {
+      font-size: 42px;
+      font-weight: 820;
+      letter-spacing: -0.04em;
+      color: #111111;
+      white-space: nowrap;
+    }
+
+    .dish-name-en {
+      font-size: 34px;
+      font-weight: 820;
+      margin-bottom: 14px;
+    }
+
+    .dish-name-he {
+      direction: rtl;
+      text-align: right;
+      font-size: 36px;
+      font-weight: 830;
+      margin-bottom: 14px;
+    }
+
+    .description {
+      font-size: 20px;
+      line-height: 1.48;
+      margin-bottom: 24px;
+    }
+
+    .description.he {
+      direction: rtl;
+      text-align: right;
+    }
+
+    .label-preview {
+      font-size: 14px;
+      font-weight: 780;
+      color: #6e6e73;
+      margin-bottom: 8px;
+    }
+
+    .label-preview.he {
+      direction: rtl;
+      text-align: right;
+    }
+
+    .ingredients {
+      font-size: 16.5px;
+      line-height: 1.55;
+      background: #fbfbfd;
+      border: 1px solid #eeeeF2;
+      border-radius: 18px;
+      padding: 16px 18px;
+    }
+
+    .ingredients.he {
+      direction: rtl;
+      text-align: right;
+    }
+
+    .divider {
+      height: 1px;
+      background: #e5e5ea;
+      margin: 28px 0 34px;
+    }
+
+    .allergen-card {
+      margin-top: 34px;
+      border-radius: 22px;
+      border: 1px solid #ffd6d6;
+      background: #fff8f8;
+      padding: 20px 22px;
+    }
+
+    .allergen-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #b00020;
+      margin-bottom: 12px;
+    }
+
+    .allergen-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .allergen-text.he {
+      direction: rtl;
+      text-align: right;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="app">
 
-<!-- LEFT SIDE -->
-<div class="panel">
+  <div class="left-stack">
 
-<h3>Manual Input</h3>
+    <section class="panel">
+      <h2>1. Extract from Apple Menu</h2>
 
-<select id="category" onchange="updateAuto()">
-  <option>Grill</option>
-  <option>Chef Special</option>
-  <option>Sandwich</option>
-  <option>Soup</option>
-  <option>Fish Special</option>
-  <option>Pizza</option>
-  <option>Bakery</option>
-  <option>Veg/Vegan</option>
-  <option>Sushi</option>
-  <option>Salad Bar</option>
-</select>
+      <p class="hint">
+        מדביקים כאן את הטקסט המלא מה-PDF או מהמערכת.
+      </p>
 
-<input id="price" placeholder="Price">
+      <label>Paste full Apple menu text</label>
 
-<hr>
+      <textarea class="raw-textarea"></textarea>
 
-<h4>English</h4>
-<input id="nameEn" placeholder="Name EN">
-<textarea id="descEn" placeholder="Description EN"></textarea>
-<textarea id="ingEn" placeholder="Ingredients EN" oninput="updateAllergens()"></textarea>
+      <div class="button-row">
+        <button>Extract Menu</button>
+        <button class="secondary">Clear Text</button>
+      </div>
 
-<hr>
+    </section>
 
-<h4>עברית</h4>
-<input id="nameHe" placeholder="שם מנה">
-<textarea id="descHe" placeholder="תיאור"></textarea>
-<textarea id="ingHe" placeholder="מרכיבים"></textarea>
+    <section class="panel">
 
-<hr>
+      <h2>2. Manual Editor</h2>
 
-<h4>Allergens (auto)</h4>
-<input id="allEn" readonly>
-<input id="allHe" readonly>
+      <div class="form-grid-2">
 
-<br>
-<button onclick="updatePreview()">Update Preview</button>
+        <div>
+          <label>Category</label>
 
-</div>
+          <select>
+            <option>Grill</option>
+            <option>Chef Special</option>
+            <option>Sandwich</option>
+            <option>Soup</option>
+            <option>Fish Special</option>
+            <option>Pizza</option>
+            <option>Bakery</option>
+            <option>Veg/Vegan</option>
+            <option>Sushi</option>
+            <option>Salad Bar</option>
+          </select>
+        </div>
 
-<!-- RIGHT SIDE (DISPLAY) -->
-<div>
+        <div>
+          <label>Price</label>
+          <input value="43">
+        </div>
 
-<div class="page-wrap">
+      </div>
 
-<div id="accent" class="top-accent"></div>
+      <label>Kosher - Auto</label>
+      <input class="read-only" value="Meat | בשרי" readonly>
 
-<div class="brand-title">Caffè Macs</div>
+      <div class="section-title">English</div>
 
-<div class="header-card">
-  <div>
-    <div>
-      <span id="catEn"></span> |
-      <span id="catHe" class="station-he"></span>
-    </div>
-    <div id="kosher"></div>
+      <label>Dish Name EN</label>
+      <input value="Hamburger & Fried Egg">
+
+      <label>Description EN</label>
+      <textarea>Hamburger with fried egg in a bun, served with vegetables and french fries.</textarea>
+
+      <label>Ingredients EN</label>
+      <textarea>All-natural beef, bread, wheat flour, egg, potatoes, pickled cucumber.</textarea>
+
+      <div class="section-title">עברית</div>
+
+      <label>שם מנה בעברית</label>
+      <input dir="rtl" value="המבורגר וביצת עין">
+
+      <label>תיאור בעברית</label>
+      <textarea dir="rtl">המבורגר בלחמנייה עם ביצת עין וצ׳יפס.</textarea>
+
+      <label>מרכיבים בעברית</label>
+      <textarea dir="rtl">בקר, לחם, קמח חיטה, ביצים, תפוחי אדמה.</textarea>
+
+      <div class="section-title">Allergens - Auto</div>
+
+      <label>Allergens EN</label>
+      <input class="read-only" value="Wheat, Gluten, Eggs">
+
+      <label>אלרגנים בעברית</label>
+      <input class="read-only" dir="rtl" value="חיטה, גלוטן, ביצים">
+
+      <div class="button-row">
+        <button>Update Preview</button>
+        <button class="secondary">Enhance Hebrew with AI</button>
+      </div>
+
+    </section>
+
   </div>
-  <div id="priceView"></div>
+
+  <!-- RIGHT -->
+
+  <aside class="right-preview">
+
+    <main class="page-wrap">
+
+      <div class="top-accent"></div>
+
+      <header class="brand-title">
+        <div class="main">Caffè Macs</div>
+      </header>
+
+      <section class="header-card">
+
+        <div>
+
+          <div class="station-line">
+            <span>Grill</span>
+            <span>|</span>
+            <span class="station-he">גריל</span>
+          </div>
+
+          <div class="meta-line">
+            <span class="kosher-badge">
+              <span class="dot"></span>
+              Meat | בשרי
+            </span>
+          </div>
+
+        </div>
+
+        <div class="price">₪43</div>
+
+      </section>
+
+      <div class="dish-name-en">Hamburger & Fried Egg</div>
+
+      <div class="description">
+        Hamburger with fried egg in a bun, served with vegetables and french fries.
+      </div>
+
+      <div class="label-preview">Ingredients</div>
+
+      <div class="ingredients">
+        All-natural beef, bread, wheat flour, egg, potatoes, pickled cucumber.
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="dish-name-he">
+        המבורגר וביצת עין
+      </div>
+
+      <div class="description he">
+        המבורגר בלחמנייה עם ביצת עין וצ׳יפס.
+      </div>
+
+      <div class="label-preview he">מרכיבים</div>
+
+      <div class="ingredients he">
+        בקר, לחם, קמח חיטה, ביצים, תפוחי אדמה.
+      </div>
+
+      <section class="allergen-card">
+
+        <div class="allergen-title">
+          Allergens / אלרגנים
+        </div>
+
+        <div class="allergen-grid">
+
+          <div>
+            Wheat, Gluten, Eggs
+          </div>
+
+          <div class="allergen-text he">
+            חיטה, גלוטן, ביצים
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </aside>
+
 </div>
-
-<div>
-  <div id="nameEnView"></div>
-  <div id="descEnView"></div>
-  <div>Ingredients</div>
-  <div id="ingEnView"></div>
-</div>
-
-<div class="divider"></div>
-
-<div>
-  <div id="nameHeView" class="dish-name-he"></div>
-  <div id="descHeView" class="description he"></div>
-  <div class="label he">מרכיבים</div>
-  <div id="ingHeView" class="ingredients he"></div>
-</div>
-
-<div class="allergen-card">
-  <div>Allergens / אלרגנים</div>
-  <div class="allergen-grid">
-    <div id="allEnView"></div>
-    <div id="allHeView" class="allergen-text he"></div>
-  </div>
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<script>
-
-/* ===== CATEGORY MAP ===== */
-
-const categoryMap = {
-  "Grill": ["גריל","Meat","בשרי","red"],
-  "Chef Special": ["ספיישל שף","Meat","בשרי","red"],
-  "Sandwich": ["כריכים","Meat","בשרי","red"],
-  "Soup": ["מרקים","","","gray"],
-  "Fish Special": ["ספיישל דגים","Dairy","חלבי","blue"],
-  "Pizza": ["פיצה","Dairy","חלבי","blue"],
-  "Bakery": ["מאפייה","Dairy","חלבי","blue"],
-  "Veg/Vegan": ["צמחוני","Dairy","חלבי","blue"],
-  "Sushi": ["סושי","Meat","בשרי","red"],
-  "Salad Bar": ["סלטים","","","gray"]
-}
-
-/* ===== ALLERGEN ENGINE ===== */
-
-function updateAllergens() {
-  let text = document.getElementById("ingEn").value.toLowerCase()
-
-  let map = {
-    "milk":"חלב",
-    "egg":"ביצים",
-    "eggs":"ביצים",
-    "gluten":"גלוטן",
-    "wheat":"חיטה",
-    "fish":"דגים",
-    "soy":"סויה",
-    "sesame":"שומשום",
-    "nuts":"אגוזים",
-    "peanut":"בוטנים",
-    "celery":"סלרי"
-  }
-
-  let en=[]
-  let he=[]
-
-  for (let key in map) {
-    if (text.includes(key)) {
-      en.push(key)
-      he.push(map[key])
-    }
-  }
-
-  document.getElementById("allEn").value = en.join(", ")
-  document.getElementById("allHe").value = he.join(", ")
-}
-
-/* ===== AUTO CATEGORY ===== */
-
-function updateAuto() {
-  let cat = document.getElementById("category").value
-  let data = categoryMap[cat]
-
-  document.getElementById("catEn").innerText = cat
-  document.getElementById("catHe").innerText = data[0]
-
-  document.getElementById("kosher").innerText =
-    data[1] + " | " + data[2]
-
-  let color = data[3]
-
-  if (color === "red") document.getElementById("accent").style.background = "red"
-  else if (color === "blue") document.getElementById("accent").style.background = "blue"
-  else document.getElementById("accent").style.background = "#999"
-}
-
-/* ===== UPDATE PREVIEW ===== */
-
-function updatePreview() {
-
-  updateAuto()
-
-  document.getElementById("priceView").innerText =
-    "₪" + document.getElementById("price").value
-
-  document.getElementById("nameEnView").innerText =
-    document.getElementById("nameEn").value
-
-  document.getElementById("descEnView").innerText =
-    document.getElementById("descEn").value
-
-  document.getElementById("ingEnView").innerText =
-    document.getElementById("ingEn").value
-
-  document.getElementById("nameHeView").innerText =
-    document.getElementById("nameHe").value
-
-  document.getElementById("descHeView").innerText =
-    document.getElementById("descHe").value
-
-  document.getElementById("ingHeView").innerText =
-    document.getElementById("ingHe").value
-
-  document.getElementById("allEnView").innerText =
-    document.getElementById("allEn").value
-
-  document.getElementById("allHeView").innerText =
-    document.getElementById("allHe").value
-}
-
-</script>
 
 </body>
 </html>
