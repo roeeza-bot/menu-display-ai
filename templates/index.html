@@ -1,676 +1,408 @@
-<!DOCTYPE html>
-<html lang="he">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Caffè Macs Display Generator</title>
+import os
+import re
+import json
+from flask import Flask, request, jsonify, render_template
+from werkzeug.utils import secure_filename
 
-<style>
-* { box-sizing: border-box; }
+try:
+    import fitz
+except Exception:
+    fitz = None
 
-body {
-  margin: 0;
-  background: #ececef;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  color: #1d1d1f;
-  padding: 24px;
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
+app = Flask(__name__)
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
+
+MEAT_STATIONS = ["grill", "chef special", "sandwich", "soup", "sushi"]
+DAIRY_STATIONS = ["fish special", "pizza", "bakery", "veg", "vegan", "vegetarian"]
+
+ALLERGEN_PATTERNS = {
+    r"\bgluten\b": ("Gluten", "גלוטן"),
+    r"\bwheat\b": ("Wheat", "חיטה"),
+    r"\begg\b|\beggs\b": ("Eggs", "ביצים"),
+    r"\bmilk\b|\bdairy\b": ("Milk", "חלב"),
+    r"\bsoy\b|\bsoya\b": ("Soy", "סויה"),
+    r"\bsesame\b": ("Sesame", "שומשום"),
+    r"\bmustard\b": ("Mustard", "חרדל"),
+    r"\blupin\b": ("Lupin", "לופין"),
+    r"\bfish\b": ("Fish", "דגים"),
+    r"\bnut\b|\bnuts\b": ("Nuts", "אגוזים"),
+    r"\bpeanut\b|\bpeanuts\b": ("Peanuts", "בוטנים"),
+    r"\bcelery\b": ("Celery", "סלרי"),
+    r"\bsulfites\b|\bsulphites\b": ("Sulfites", "סולפיטים"),
 }
 
-.app {
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 24px;
-  align-items: start;
-}
 
-.left-stack { display: flex; flex-direction: column; gap: 18px; }
-
-.panel {
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.06);
-  padding: 22px;
-}
-
-.panel h2 { margin: 0 0 6px; font-size: 21px; }
-.hint { margin: 0 0 18px; color: #6e6e73; font-size: 14px; }
-
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 750;
-  color: #6e6e73;
-  margin-bottom: 7px;
-}
-
-input, textarea, select {
-  width: 100%;
-  border: 1px solid #d2d2d7;
-  border-radius: 12px;
-  padding: 11px 12px;
-  font-size: 14px;
-  background: #ffffff;
-  margin-bottom: 14px;
-}
-
-textarea { min-height: 76px; resize: vertical; }
-.raw-textarea { min-height: 185px; font-family: monospace; font-size: 13px; }
-
-.button-row { display: flex; gap: 10px; flex-wrap: wrap; }
-
-button {
-  border: none;
-  border-radius: 999px;
-  background: #0071e3;
-  color: white;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-button.secondary { background: #e8e8ed; color: #1d1d1f; }
-button.small { padding: 7px 12px; font-size: 12px; }
-
-.results-list { display: grid; gap: 10px; margin-top: 16px; }
-
-.result-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-  border: 1px solid #eeeeF2;
-  background: #fbfbfd;
-  border-radius: 14px;
-  padding: 12px 14px;
-}
-
-.result-title { font-weight: 760; margin-bottom: 4px; }
-.result-meta { color: #6e6e73; font-size: 13px; }
-
-.form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.read-only { background: #f5f5f7; color: #515154; }
-
-.section-title {
-  margin: 22px 0 12px;
-  padding-top: 18px;
-  border-top: 1px solid #eeeeF2;
-  font-size: 16px;
-  font-weight: 820;
-}
-
-.right-preview { position: sticky; top: 24px; }
-
-/* FINAL DISPLAY TEMPLATE */
-
-.page-wrap {
-  width: 100%;
-  min-height: 980px;
-  background: #ffffff;
-  border-radius: 28px;
-  box-shadow: 0 18px 55px rgba(0,0,0,0.14);
-  padding: 42px 48px 36px;
-  position: relative;
-  overflow: hidden;
-}
-
-.top-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: #8e8e93;
-}
-
-.brand-title { text-align: center; margin: 8px 0 28px; }
-.brand-title .main { font-size: 34px; font-weight: 860; }
-
-.header-card {
-  border: 1px solid #e5e5ea;
-  background: #f8f8fa;
-  border-radius: 24px;
-  padding: 22px 24px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 38px;
-}
-
-.station-line {
-  font-size: 21px;
-  font-weight: 760;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.station-he { direction: rtl; color: #515154; font-weight: 680; }
-.meta-line { margin-top: 10px; }
-
-.kosher-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-weight: 750;
-  font-size: 15px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.price {
-  font-size: 42px;
-  font-weight: 820;
-  color: #111111;
-  white-space: nowrap;
-}
-
-.section { margin-bottom: 36px; }
-
-.section-head {
-  display: flex;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.section-head::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e5ea;
-}
-
-.section-head.he { direction: rtl; }
-
-.section-head.he::before {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e5ea;
-}
-
-.section-head.he::after { display: none; }
-
-.dish-name-en {
-  font-size: 34px;
-  font-weight: 820;
-  margin-bottom: 14px;
-}
-
-.dish-name-he {
-  direction: rtl;
-  text-align: right;
-  font-size: 36px;
-  font-weight: 830;
-  margin-bottom: 14px;
-}
-
-.description {
-  font-size: 20px;
-  line-height: 1.48;
-  color: #2c2c2e;
-  margin-bottom: 24px;
-}
-
-.description.he { direction: rtl; text-align: right; }
-
-.label-preview {
-  font-size: 14px;
-  font-weight: 780;
-  color: #6e6e73;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-
-.label-preview.he {
-  direction: rtl;
-  display: block;
-  text-align: right;
-  text-transform: none;
-}
-
-.ingredients {
-  font-size: 16.5px;
-  line-height: 1.55;
-  color: #3a3a3c;
-  background: #fbfbfd;
-  border: 1px solid #eeeeF2;
-  border-radius: 18px;
-  padding: 16px 18px;
-}
-
-.ingredients.he { direction: rtl; text-align: right; }
-
-.divider {
-  height: 1px;
-  background: #e5e5ea;
-  margin: 28px 0 34px;
-}
-
-.allergen-card {
-  margin-top: 34px;
-  border-radius: 22px;
-  border: 1px solid #ffd6d6;
-  background: #fff8f8;
-  padding: 20px 22px;
-}
-
-.allergen-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #b00020;
-  margin-bottom: 12px;
-}
-
-.allergen-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.allergen-text {
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-.allergen-text.he { direction: rtl; text-align: right; }
-
-@media print {
-  body {
-    background: white;
-    padding: 0;
-  }
-
-  .left-stack {
-    display: none;
-  }
-
-  .app {
-    display: block;
-  }
-
-  .right-preview {
-    position: static;
-  }
-
-  .page-wrap {
-    box-shadow: none;
-    border-radius: 0;
-    width: 100%;
-    min-height: 100vh;
-  }
-}
-</style>
-</head>
-
-<body>
-
-<div class="app">
-
-  <div class="left-stack">
-
-    <section class="panel">
-      <h2>1. Extract from Apple Menu</h2>
-      <p class="hint">מדביקים כאן את הטקסט המלא מה-PDF או מהמערכת. אחרי Extract בוחרים מנה והיא נטענת לעריכה ידנית.</p>
-
-      <label>Paste full Apple menu text</label>
-      <textarea id="fullText" class="raw-textarea"></textarea>
-
-      <div class="button-row">
-        <button onclick="extractMenu()">Extract Menu</button>
-        <button class="secondary" onclick="clearText()">Clear Text</button>
-      </div>
-
-      <div id="status" class="hint" style="margin-top:12px;"></div>
-      <div id="results" class="results-list"></div>
-    </section>
-
-    <section class="panel">
-      <h2>2. Manual Editor</h2>
-      <p class="hint">אפשר לערוך מנה שהגיעה מה-Extract או להזין הכל ידנית מאפס.</p>
-
-      <div class="form-grid-2">
-        <div>
-          <label>Category - בחירה מתוך רשימה</label>
-          <select id="category" onchange="applyCategory(); updatePreview();">
-            <option>Grill</option>
-            <option>Chef Special</option>
-            <option>Sandwich</option>
-            <option>Soup</option>
-            <option>Fish Special</option>
-            <option>Pizza</option>
-            <option>Bakery</option>
-            <option>Veg/Vegan</option>
-            <option>Sushi</option>
-            <option>Salad Bar</option>
-          </select>
-        </div>
-
-        <div>
-          <label>Price - נשלף אוטומטית או ידני</label>
-          <input id="price" oninput="updatePreview()" placeholder="55">
-        </div>
-      </div>
-
-      <label>Kosher - אוטומטי לפי קטגוריה</label>
-      <input id="kosher" class="read-only" readonly>
-
-      <div class="section-title">English</div>
-
-      <label>Dish Name EN</label>
-      <input id="nameEn" oninput="updatePreview()">
-
-      <label>Description EN</label>
-      <textarea id="descEn" oninput="updatePreview()"></textarea>
-
-      <label>Ingredients EN - מכאן המערכת מפיקה אלרגנים</label>
-      <textarea id="ingEn" oninput="updateAllergens(); updatePreview();"></textarea>
-
-      <div class="section-title">עברית</div>
-
-      <label>שם מנה בעברית</label>
-      <input id="nameHe" dir="rtl" oninput="updatePreview()">
-
-      <label>תיאור בעברית</label>
-      <textarea id="descHe" dir="rtl" oninput="updatePreview()"></textarea>
-
-      <label>מרכיבים בעברית</label>
-      <textarea id="ingHe" dir="rtl" oninput="updatePreview()"></textarea>
-
-      <div class="section-title">Allergens - Auto</div>
-
-      <label>Allergens EN - אוטומטי מתוך Ingredients EN</label>
-      <input id="allEn" class="read-only" readonly>
-
-      <label>אלרגנים בעברית - אוטומטי</label>
-      <input id="allHe" class="read-only" dir="rtl" readonly>
-
-      <div class="button-row">
-        <button onclick="updatePreview()">Update Preview</button>
-        <button class="secondary" onclick="enhanceHebrew()">Enhance Hebrew with AI</button>
-        <button class="secondary" onclick="resetEditor()">Reset Editor</button>
-        <button class="secondary" onclick="window.print()">Print / Export PDF</button>
-      </div>
-    </section>
-
-  </div>
-
-  <aside class="right-preview">
-    <main class="page-wrap">
-      <div id="accent" class="top-accent"></div>
-
-      <header class="brand-title">
-        <div class="main">Caffè Macs</div>
-      </header>
-
-      <section class="header-card">
-        <div>
-          <div class="station-line">
-            <span id="catEnView">Category</span>
-            <span>|</span>
-            <span id="catHeView" class="station-he">קטגוריה</span>
-          </div>
-
-          <div class="meta-line">
-            <span id="kosherBadge" class="kosher-badge">
-              <span id="kosherDot" class="dot"></span>
-              <span id="kosherView">Kosher | כשרות</span>
-            </span>
-          </div>
-        </div>
-
-        <div id="priceView" class="price">₪55</div>
-      </section>
-
-      <section class="section">
-        <div class="section-head"></div>
-        <div id="nameEnView" class="dish-name-en">Dish Name</div>
-        <div id="descEnView" class="description">Description will appear here.</div>
-        <div class="label-preview">Ingredients</div>
-        <div id="ingEnView" class="ingredients">Ingredients will appear here.</div>
-      </section>
-
-      <div class="divider"></div>
-
-      <section class="section">
-        <div class="section-head he"></div>
-        <div id="nameHeView" class="dish-name-he">שם מנה</div>
-        <div id="descHeView" class="description he">תיאור המנה יופיע כאן.</div>
-        <div class="label-preview he">מרכיבים</div>
-        <div id="ingHeView" class="ingredients he">מרכיבים יופיעו כאן.</div>
-      </section>
-
-      <section class="allergen-card">
-        <div class="allergen-title">Allergens / אלרגנים</div>
-        <div class="allergen-grid">
-          <div id="allEnView" class="allergen-text">None</div>
-          <div id="allHeView" class="allergen-text he">ללא</div>
-        </div>
-      </section>
-    </main>
-  </aside>
-
-</div>
-
-<script>
-const categoryMap = {
-  "Grill": {he:"גריל", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
-  "Chef Special": {he:"ספיישל שף", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
-  "Sandwich": {he:"כריכים", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
-  "Soup": {he:"מרקים", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
-  "Fish Special": {he:"ספיישל דגים", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
-  "Pizza": {he:"פיצה", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
-  "Bakery": {he:"מאפייה", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
-  "Veg/Vegan": {he:"צמחוני / טבעוני", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
-  "Sushi": {he:"סושי", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
-  "Salad Bar": {he:"סלט בר", kosherEn:"Manual", kosherHe:"ידני", color:"#8e8e93", bg:"#f2f2f7", text:"#6e6e73"}
-};
-
-const allergenMap = [
-  {keys:["gluten"], en:"Gluten", he:"גלוטן"},
-  {keys:["wheat"], en:"Wheat", he:"חיטה"},
-  {keys:["egg","eggs"], en:"Eggs", he:"ביצים"},
-  {keys:["milk","dairy"], en:"Milk", he:"חלב"},
-  {keys:["fish"], en:"Fish", he:"דגים"},
-  {keys:["soy","soya"], en:"Soy", he:"סויה"},
-  {keys:["sesame"], en:"Sesame", he:"שומשום"},
-  {keys:["mustard"], en:"Mustard", he:"חרדל"},
-  {keys:["lupin"], en:"Lupin", he:"לופין"},
-  {keys:["peanut","peanuts"], en:"Peanuts", he:"בוטנים"},
-  {keys:["nut","nuts"], en:"Nuts", he:"אגוזים"},
-  {keys:["celery"], en:"Celery", he:"סלרי"},
-  {keys:["sulfites","sulphites"], en:"Sulfites", he:"סולפיטים"}
-];
-
-function cleanPrice(value) {
-  if (!value) return "";
-  return String(value).replace("₪", "").replace(".00", "").trim();
-}
-
-function applyCategory() {
-  const cat = document.getElementById("category").value;
-  const data = categoryMap[cat];
-
-  document.getElementById("kosher").value = `${data.kosherEn} | ${data.kosherHe}`;
-
-  document.getElementById("accent").style.background = data.color;
-  document.getElementById("kosherBadge").style.background = data.bg;
-  document.getElementById("kosherBadge").style.color = data.text;
-  document.getElementById("kosherDot").style.background = data.color;
-}
-
-function updateAllergens() {
-  const text = document.getElementById("ingEn").value.toLowerCase();
-  const foundEn = [];
-  const foundHe = [];
-
-  allergenMap.forEach(item => {
-    const hit = item.keys.some(k => new RegExp("\\b" + k + "\\b").test(text));
-    if (hit) {
-      foundEn.push(item.en);
-      foundHe.push(item.he);
-    }
-  });
-
-  document.getElementById("allEn").value = foundEn.join(", ");
-  document.getElementById("allHe").value = foundHe.join(", ");
-}
-
-function updatePreview() {
-  applyCategory();
-
-  const cat = document.getElementById("category").value;
-  const data = categoryMap[cat];
-
-  document.getElementById("catEnView").innerText = cat;
-  document.getElementById("catHeView").innerText = data.he;
-  document.getElementById("kosherView").innerText = `${data.kosherEn} | ${data.kosherHe}`;
-
-  const price = cleanPrice(document.getElementById("price").value) || "55";
-  document.getElementById("priceView").innerText = `₪${price}`;
-
-  document.getElementById("nameEnView").innerText = document.getElementById("nameEn").value || "Dish Name";
-  document.getElementById("descEnView").innerText = document.getElementById("descEn").value || "Description will appear here.";
-  document.getElementById("ingEnView").innerText = document.getElementById("ingEn").value || "Ingredients will appear here.";
-
-  document.getElementById("nameHeView").innerText = document.getElementById("nameHe").value || "שם מנה";
-  document.getElementById("descHeView").innerText = document.getElementById("descHe").value || "תיאור המנה יופיע כאן.";
-  document.getElementById("ingHeView").innerText = document.getElementById("ingHe").value || "מרכיבים יופיעו כאן.";
-
-  document.getElementById("allEnView").innerText = document.getElementById("allEn").value || "None";
-  document.getElementById("allHeView").innerText = document.getElementById("allHe").value || "ללא";
-}
-
-function normalizeCategory(raw) {
-  if (!raw) return "Grill";
-  const clean = raw.replace(/\(.*?\)/g, "").trim().toLowerCase();
-
-  for (const cat of Object.keys(categoryMap)) {
-    if (clean.includes(cat.toLowerCase())) return cat;
-  }
-
-  return "Grill";
-}
-
-function fillForm(d) {
-  const category = normalizeCategory(d.category || "");
-  document.getElementById("category").value = category;
-
-  document.getElementById("price").value = cleanPrice(d.price || "");
-  document.getElementById("nameEn").value = d.name_en || "";
-  document.getElementById("descEn").value = d.description_en || "";
-  document.getElementById("ingEn").value = d.ingredients_en || "";
-  document.getElementById("nameHe").value = d.name_he || "";
-  document.getElementById("descHe").value = d.description_he || "";
-  document.getElementById("ingHe").value = d.ingredients_he || "";
-
-  updateAllergens();
-  updatePreview();
-}
-
-async function extractMenu() {
-  const rawText = document.getElementById("fullText").value;
-  const status = document.getElementById("status");
-  const results = document.getElementById("results");
-
-  status.innerText = "Extracting...";
-  results.innerHTML = "";
-
-  try {
-    const res = await fetch("/extract", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ text: rawText })
-    });
-
-    const data = await res.json();
-    const dishes = data.dishes || [];
-
-    dishes.forEach((dish, index) => {
-      const item = document.createElement("div");
-      item.className = "result-item";
-
-      item.innerHTML = `
-        <div>
-          <div class="result-title">${dish.name_he || dish.name_en || "Dish " + (index + 1)}</div>
-          <div class="result-meta">${dish.category || ""} | ${dish.kosher || ""} | ₪${cleanPrice(dish.price || "")}</div>
-        </div>
-        <button class="small secondary">Load to Editor</button>
-      `;
-
-      item.querySelector("button").onclick = () => fillForm(dish);
-      results.appendChild(item);
-    });
-
-    if (dishes.length > 0) {
-      fillForm(dishes[0]);
+def clean_text(text):
+    if not text:
+        return ""
+    text = text.replace("\r", "\n")
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = text.replace("and and", "and")
+    text = text.replace("beaf", "beef")
+    text = text.replace("tomatoes salad", "tomato salad")
+    return text.strip()
+
+
+def clean_ingredients_for_display(ingredients):
+    if not ingredients:
+        return ""
+    ingredients = re.sub(r"\([^)]*\)", "", ingredients)
+    ingredients = re.sub(r"\s+,", ",", ingredients)
+    ingredients = re.sub(r",\s*,", ",", ingredients)
+    ingredients = re.sub(r"\s{2,}", " ", ingredients)
+    return clean_text(ingredients).strip(" ,.")
+
+
+def split_category(raw):
+    raw = clean_text(raw)
+    match = re.search(r"^(.*?)\s*\((.*?)\)", raw)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+    return raw.strip(), ""
+
+
+def map_kosher(category, raw_kosher=""):
+    c = (category or "").lower()
+    raw = (raw_kosher or "").lower()
+
+    if "salad bar" in c:
+        return ""
+
+    for station in MEAT_STATIONS:
+        if station in c:
+            return "בשרי"
+
+    for station in DAIRY_STATIONS:
+        if station in c:
+            return "חלבי"
+
+    if raw == "meat":
+        return "בשרי"
+    if raw == "dairy":
+        return "חלבי"
+
+    return ""
+
+
+def extract_allergens(text):
+    text_l = (text or "").lower()
+    found_en = []
+    found_he = []
+
+    order_he = [
+        "גלוטן", "חיטה", "ביצים", "חלב", "דגים", "סויה",
+        "שומשום", "חרדל", "לופין", "אגוזים", "בוטנים",
+        "סלרי", "סולפיטים"
+    ]
+
+    for pattern, (en, he) in ALLERGEN_PATTERNS.items():
+        if re.search(pattern, text_l):
+            if en not in found_en:
+                found_en.append(en)
+            if he not in found_he:
+                found_he.append(he)
+
+    combined = list(zip(found_en, found_he))
+    combined.sort(key=lambda pair: order_he.index(pair[1]) if pair[1] in order_he else 999)
+
+    return {
+        "allergens_en": ", ".join([x[0] for x in combined]),
+        "allergens_he": ", ".join([x[1] for x in combined]),
+        "allergens": ", ".join([x[1] for x in combined])
     }
 
-    status.innerText = `Found ${dishes.length} dishes.`;
-  } catch (error) {
-    console.error(error);
-    status.innerText = "Extract failed.";
-  }
-}
 
-async function enhanceHebrew() {
-  const payload = {
-    category: document.getElementById("category").value,
-    name_en: document.getElementById("nameEn").value,
-    description_en: document.getElementById("descEn").value,
-    ingredients_en: document.getElementById("ingEn").value,
-    price: document.getElementById("price").value
-  };
+def extract_text_from_pdf(path):
+    if fitz is None:
+        return ""
 
-  try {
-    const res = await fetch("/enhance", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
+    doc = fitz.open(path)
+    text = "\n".join(page.get_text() for page in doc)
+    doc.close()
+    return text
 
-    const data = await res.json();
 
-    if (data.success && data.dish) {
-      document.getElementById("nameHe").value = data.dish.name_he || "";
-      document.getElementById("descHe").value = data.dish.description_he || "";
-      document.getElementById("ingHe").value = data.dish.ingredients_he || "";
-      updatePreview();
+def is_category_line(line):
+    l = line.lower()
+    return "(" in line and ")" in line and ("meat" in l or "dairy" in l)
+
+
+def is_price_line(line):
+    return bool(re.search(r"₪\s*\d+", line) or re.fullmatch(r"\d+(\.\d+)?", line))
+
+
+def clean_price(line):
+    price = re.sub(r"[^\d.]", "", line or "")
+    return price.replace(".00", "").strip() or "55"
+
+
+def parse_text(text):
+    text = clean_text(text)
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+    dishes = []
+    current = None
+    ingredient_mode = False
+    description_mode = False
+
+    for line in lines:
+
+        if is_category_line(line):
+            if current and current.get("name"):
+                dishes.append(current)
+
+            current = {
+                "category_raw": line,
+                "name": "",
+                "description": "",
+                "ingredients": "",
+                "price": "55"
+            }
+
+            ingredient_mode = False
+            description_mode = False
+            continue
+
+        if current is None:
+            continue
+
+        if is_price_line(line):
+            current["price"] = clean_price(line)
+            ingredient_mode = False
+            description_mode = True
+            continue
+
+        if line.lower().startswith("ingredients"):
+            ing = line.split(":", 1)[-1].strip() if ":" in line else ""
+            current["ingredients"] = ing
+            ingredient_mode = True
+            description_mode = False
+            continue
+
+        if ingredient_mode:
+            current["ingredients"] += " " + line
+            continue
+
+        if not current["name"]:
+            current["name"] = line
+            continue
+
+        # The Apple page repeats the dish name right before Ingredients.
+        # When that happens, stop collecting description.
+        if line == current["name"]:
+            description_mode = False
+            continue
+
+        # After price, collect all description lines until repeated name / Ingredients.
+        if description_mode:
+            current["description"] += (" " if current["description"] else "") + line
+            continue
+
+        if not current["description"]:
+            current["description"] = line
+
+    if current and current.get("name"):
+        dishes.append(current)
+
+    return dishes
+
+
+def enhance_with_ai(dish):
+    fallback = {
+        "name_he": dish.get("name_en", ""),
+        "description_he": dish.get("description_en", ""),
+        "ingredients_he": dish.get("ingredients_en", "")
     }
-  } catch (error) {
-    console.error(error);
-  }
+
+    if client is None:
+        return fallback
+
+    prompt = {
+        "station": dish.get("category", ""),
+        "kosher": dish.get("kosher", ""),
+        "name_en": dish.get("name_en", ""),
+        "description_en": dish.get("description_en", ""),
+        "ingredients_en": dish.get("ingredients_en", "")
+    }
+
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0.1,
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are a professional culinary Hebrew translator for Apple Herzliya Caffè Macs.
+Return JSON only.
+
+Rules:
+- Translate only the Hebrew fields.
+- Do not decide kosher.
+- Do not decide station/category.
+- Do not decide allergens.
+- Do not invent ingredients.
+- Do not add marketing language.
+- Do not add adjectives like delicious, delightful, rich, indulgent, exciting, amazing, unless they appear in the source.
+- Dish name should be a professional Hebrew menu name, accurate to the English.
+- Description must be an accurate translation of the English description.
+- Do not rewrite the description creatively.
+- Keep the tone neutral, professional and culinary.
+- Ingredients should be translated to Hebrew, comma separated.
+- Keep culinary terms when appropriate: טחינה, אריסה, מטבוחה, פתיתים, קובה, סינייה, בריסקט.
+- If a vegan dish is kosher dairy because of the station, do not mention parve.
+
+Return exactly:
+{
+  "name_he": "...",
+  "description_he": "...",
+  "ingredients_he": "..."
 }
+"""
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(prompt, ensure_ascii=False)
+                }
+            ]
+        )
 
-function clearText() {
-  document.getElementById("fullText").value = "";
-  document.getElementById("results").innerHTML = "";
-  document.getElementById("status").innerText = "";
-}
+        content = response.choices[0].message.content.strip()
+        content = content.replace("```json", "").replace("```", "").strip()
+        data = json.loads(content)
 
-function resetEditor() {
-  document.querySelectorAll("#nameEn, #descEn, #ingEn, #nameHe, #descHe, #ingHe, #price").forEach(el => el.value = "");
-  document.getElementById("category").value = "Grill";
-  updateAllergens();
-  updatePreview();
-}
+        return {
+            "name_he": data.get("name_he") or fallback["name_he"],
+            "description_he": data.get("description_he") or fallback["description_he"],
+            "ingredients_he": data.get("ingredients_he") or fallback["ingredients_he"]
+        }
 
-applyCategory();
-updatePreview();
-</script>
+    except Exception:
+        return fallback
 
-</body>
-</html>
+
+def normalize_dish(raw):
+    category, raw_kosher = split_category(raw.get("category_raw", ""))
+    kosher = map_kosher(category, raw_kosher)
+
+    raw_ingredients = clean_text(raw.get("ingredients", ""))
+
+    dish = {
+        "category": category,
+        "kosher": kosher,
+        "name_en": clean_text(raw.get("name", "")),
+        "description_en": clean_text(raw.get("description", "")),
+        "ingredients_en": clean_ingredients_for_display(raw_ingredients),
+        "price": raw.get("price", "55")
+    }
+
+    allergens = extract_allergens(raw_ingredients)
+    dish.update(allergens)
+
+    ai = enhance_with_ai(dish)
+
+    dish["name_he"] = ai["name_he"]
+    dish["description_he"] = ai["description_he"]
+    dish["ingredients_he"] = ai["ingredients_he"]
+
+    return dish
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/extract", methods=["POST"])
+def extract():
+    raw_text = ""
+
+    if "file" in request.files:
+        file = request.files["file"]
+        filename = secure_filename(file.filename)
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(path)
+
+        if filename.lower().endswith(".pdf"):
+            raw_text = extract_text_from_pdf(path)
+        else:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                raw_text = f.read()
+    else:
+        data = request.json or {}
+        raw_text = data.get("text", "")
+
+    raw_dishes = parse_text(raw_text)
+    dishes = [normalize_dish(d) for d in raw_dishes]
+
+    return jsonify({
+        "success": True,
+        "count": len(dishes),
+        "dishes": dishes
+    })
+
+
+@app.route("/enhance", methods=["POST"])
+def enhance():
+    data = request.json or {}
+
+    fixed = {
+        "category": data.get("category", ""),
+        "kosher": data.get("kosher", ""),
+        "name_en": data.get("name_en", ""),
+        "description_en": data.get("description_en", ""),
+        "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
+        "price": data.get("price", "55")
+    }
+
+    ai = enhance_with_ai(fixed)
+
+    fixed["name_he"] = ai["name_he"]
+    fixed["description_he"] = ai["description_he"]
+    fixed["ingredients_he"] = ai["ingredients_he"]
+
+    return jsonify({
+        "success": True,
+        "dish": fixed
+    })
+
+
+@app.route("/create-display", methods=["POST"])
+def create_display():
+    data = request.json or {}
+
+    display = {
+        "kosher": data.get("kosher", ""),
+        "category": data.get("category", ""),
+        "name_he": data.get("name_he", ""),
+        "name_en": data.get("name_en", ""),
+        "description_he": data.get("description_he", ""),
+        "description_en": data.get("description_en", ""),
+        "ingredients_he": data.get("ingredients_he", ""),
+        "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
+        "allergens": data.get("allergens", ""),
+        "allergens_en": data.get("allergens_en", ""),
+        "allergens_he": data.get("allergens_he", ""),
+        "price": data.get("price", "55")
+    }
+
+    return jsonify({
+        "success": True,
+        "display": display
+    })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
