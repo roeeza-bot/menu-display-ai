@@ -23,11 +23,7 @@ body {
   align-items: start;
 }
 
-.left-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+.left-stack { display: flex; flex-direction: column; gap: 18px; }
 
 .panel {
   background: #ffffff;
@@ -36,16 +32,8 @@ body {
   padding: 22px;
 }
 
-.panel h2 {
-  margin: 0 0 6px;
-  font-size: 21px;
-}
-
-.hint {
-  margin: 0 0 18px;
-  color: #6e6e73;
-  font-size: 14px;
-}
+.panel h2 { margin: 0 0 6px; font-size: 21px; }
+.hint { margin: 0 0 18px; color: #6e6e73; font-size: 14px; }
 
 label {
   display: block;
@@ -65,22 +53,10 @@ input, textarea, select {
   margin-bottom: 14px;
 }
 
-textarea {
-  min-height: 76px;
-  resize: vertical;
-}
+textarea { min-height: 76px; resize: vertical; }
+.raw-textarea { min-height: 185px; font-family: monospace; font-size: 13px; }
 
-.raw-textarea {
-  min-height: 185px;
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.button-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+.button-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
 button {
   border: none;
@@ -93,21 +69,10 @@ button {
   cursor: pointer;
 }
 
-button.secondary {
-  background: #e8e8ed;
-  color: #1d1d1f;
-}
+button.secondary { background: #e8e8ed; color: #1d1d1f; }
+button.small { padding: 7px 12px; font-size: 12px; }
 
-button.small {
-  padding: 7px 12px;
-  font-size: 12px;
-}
-
-.results-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
+.results-list { display: grid; gap: 10px; margin-top: 16px; }
 
 .result-item {
   display: grid;
@@ -120,15 +85,8 @@ button.small {
   padding: 12px 14px;
 }
 
-.result-title {
-  font-weight: 760;
-  margin-bottom: 4px;
-}
-
-.result-meta {
-  color: #6e6e73;
-  font-size: 13px;
-}
+.result-title { font-weight: 760; margin-bottom: 4px; }
+.result-meta { color: #6e6e73; font-size: 13px; }
 
 .form-grid-2 {
   display: grid;
@@ -136,10 +94,7 @@ button.small {
   gap: 12px;
 }
 
-.read-only {
-  background: #f5f5f7;
-  color: #515154;
-}
+.read-only { background: #f5f5f7; color: #515154; }
 
 .section-title {
   margin: 22px 0 12px;
@@ -149,10 +104,7 @@ button.small {
   font-weight: 820;
 }
 
-.right-preview {
-  position: sticky;
-  top: 24px;
-}
+.right-preview { position: sticky; top: 24px; }
 
 /* FINAL DISPLAY TEMPLATE */
 
@@ -176,15 +128,8 @@ button.small {
   background: #8e8e93;
 }
 
-.brand-title {
-  text-align: center;
-  margin: 8px 0 28px;
-}
-
-.brand-title .main {
-  font-size: 34px;
-  font-weight: 860;
-}
+.brand-title { text-align: center; margin: 8px 0 28px; }
+.brand-title .main { font-size: 34px; font-weight: 860; }
 
 .header-card {
   border: 1px solid #e5e5ea;
@@ -206,15 +151,8 @@ button.small {
   flex-wrap: wrap;
 }
 
-.station-he {
-  direction: rtl;
-  color: #515154;
-  font-weight: 680;
-}
-
-.meta-line {
-  margin-top: 10px;
-}
+.station-he { direction: rtl; color: #515154; font-weight: 680; }
+.meta-line { margin-top: 10px; }
 
 .kosher-badge {
   display: inline-flex;
@@ -240,9 +178,7 @@ button.small {
   white-space: nowrap;
 }
 
-.section {
-  margin-bottom: 36px;
-}
+.section { margin-bottom: 36px; }
 
 .section-head {
   display: flex;
@@ -257,9 +193,7 @@ button.small {
   background: #e5e5ea;
 }
 
-.section-head.he {
-  direction: rtl;
-}
+.section-head.he { direction: rtl; }
 
 .section-head.he::before {
   content: "";
@@ -268,9 +202,7 @@ button.small {
   background: #e5e5ea;
 }
 
-.section-head.he::after {
-  display: none;
-}
+.section-head.he::after { display: none; }
 
 .dish-name-en {
   font-size: 34px;
@@ -293,10 +225,7 @@ button.small {
   margin-bottom: 24px;
 }
 
-.description.he {
-  direction: rtl;
-  text-align: right;
-}
+.description.he { direction: rtl; text-align: right; }
 
 .label-preview {
   font-size: 14px;
@@ -323,10 +252,7 @@ button.small {
   padding: 16px 18px;
 }
 
-.ingredients.he {
-  direction: rtl;
-  text-align: right;
-}
+.ingredients.he { direction: rtl; text-align: right; }
 
 .divider {
   height: 1px;
@@ -360,9 +286,32 @@ button.small {
   line-height: 1.5;
 }
 
-.allergen-text.he {
-  direction: rtl;
-  text-align: right;
+.allergen-text.he { direction: rtl; text-align: right; }
+
+@media print {
+  body {
+    background: white;
+    padding: 0;
+  }
+
+  .left-stack {
+    display: none;
+  }
+
+  .app {
+    display: block;
+  }
+
+  .right-preview {
+    position: static;
+  }
+
+  .page-wrap {
+    box-shadow: none;
+    border-radius: 0;
+    width: 100%;
+    min-height: 100vh;
+  }
 }
 </style>
 </head>
@@ -453,6 +402,7 @@ button.small {
         <button onclick="updatePreview()">Update Preview</button>
         <button class="secondary" onclick="enhanceHebrew()">Enhance Hebrew with AI</button>
         <button class="secondary" onclick="resetEditor()">Reset Editor</button>
+        <button class="secondary" onclick="window.print()">Print / Export PDF</button>
       </div>
     </section>
 
