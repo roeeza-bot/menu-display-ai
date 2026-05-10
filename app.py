@@ -42,6 +42,20 @@ ALLERGEN_PATTERNS = {
     r"\bsulfites\b|\bsulphites\b": ("Sulfites", "סולפיטים"),
 }
 
+CULINARY_HE_REPLACEMENTS = {
+    "lemon grass": "למון גראס",
+    "lemongrass": "למון גראס",
+    "lemon-grass": "למון גראס",
+    "stracciatella": "סטרצ׳יאטלה",
+    "yuzu": "יוזו",
+    "miso": "מיסו",
+    "panko": "פנקו",
+    "aioli": "איולי",
+    "brioche": "בריוש",
+    "kimchi": "קימצ׳י",
+    "shatta": "שאטה",
+}
+
 
 def clean_text(text):
     if not text:
@@ -63,6 +77,22 @@ def clean_ingredients_for_display(ingredients):
     ingredients = re.sub(r",\s*,", ",", ingredients)
     ingredients = re.sub(r"\s{2,}", " ", ingredients)
     return clean_text(ingredients).strip(" ,.")
+
+
+def post_process_hebrew(text):
+    if not text:
+        return ""
+
+    result = text
+
+    for eng, heb in CULINARY_HE_REPLACEMENTS.items():
+        result = re.sub(eng, heb, result, flags=re.IGNORECASE)
+
+    result = result.replace("שatta", "שאטה")
+    result = result.replace("למון גראס,", "למון גראס,")
+    result = result.replace("חמוץ מתוק", "חמוץ-מתוק")
+
+    return result.strip()
 
 
 def split_category(raw):
@@ -148,6 +178,41 @@ def clean_price(line):
     return price.replace(".00", "").strip() or "55"
 
 
+def is_bad_generic_description(description, name, category):
+    if not description:
+        return True
+
+    d = description.lower().strip()
+    n = (name or "").lower().strip()
+    c = (category or "").lower().strip()
+
+    bad_phrases = [
+        "pizza of the day",
+        "soup of the day",
+        "dish of the day",
+        "special of the day"
+    ]
+
+    if d in bad_phrases:
+        return True
+
+    if any(phrase in d for phrase in bad_phrases):
+        cleaned = d
+        for phrase in bad_phrases:
+            cleaned = cleaned.replace(phrase, "")
+        cleaned = cleaned.replace(n, "").replace("pizza", "").replace("soup", "").strip()
+        if len(cleaned) < 8:
+            return True
+
+    if n and d == n:
+        return True
+
+    if c and d == c:
+        return True
+
+    return False
+
+
 def parse_text(text):
     text = clean_text(text)
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -199,13 +264,10 @@ def parse_text(text):
             current["name"] = line
             continue
 
-        # The Apple page repeats the dish name right before Ingredients.
-        # When that happens, stop collecting description.
         if line == current["name"]:
             description_mode = False
             continue
 
-        # After price, collect all description lines until repeated name / Ingredients.
         if description_mode:
             current["description"] += (" " if current["description"] else "") + line
             continue
@@ -229,12 +291,15 @@ def enhance_with_ai(dish):
     if client is None:
         return fallback
 
+    needs_description = not dish.get("description_en", "").strip()
+
     prompt = {
         "station": dish.get("category", ""),
         "kosher": dish.get("kosher", ""),
         "name_en": dish.get("name_en", ""),
         "description_en": dish.get("description_en", ""),
-        "ingredients_en": dish.get("ingredients_en", "")
+        "ingredients_en": dish.get("ingredients_en", ""),
+        "needs_description_from_ingredients": needs_description
     }
 
     try:
@@ -257,10 +322,21 @@ Rules:
 - Do not add marketing language.
 - Do not add adjectives like delicious, delightful, rich, indulgent, exciting, amazing, unless they appear in the source.
 - Dish name should be a professional Hebrew menu name, accurate to the English.
-- Description must be an accurate translation of the English description.
-- Do not rewrite the description creatively.
+- If description_en exists, description_he must be an accurate translation of it.
+- Do not rewrite description_en creatively.
+- If description_en is empty or generic, create one neutral short description using only name_en and ingredients_en.
 - Keep the tone neutral, professional and culinary.
 - Ingredients should be translated to Hebrew, comma separated.
+- Translate/normalize culinary terms consistently:
+  lemongrass / lemon grass = למון גראס
+  stracciatella = סטרצ׳יאטלה
+  yuzu = יוזו
+  miso = מיסו
+  panko = פנקו
+  aioli = איולי
+  brioche = בריוש
+  kimchi = קימצ׳י
+  shatta = שאטה
 - Keep culinary terms when appropriate: טחינה, אריסה, מטבוחה, פתיתים, קובה, סינייה, בריסקט.
 - If a vegan dish is kosher dairy because of the station, do not mention parve.
 
@@ -284,9 +360,9 @@ Return exactly:
         data = json.loads(content)
 
         return {
-            "name_he": data.get("name_he") or fallback["name_he"],
-            "description_he": data.get("description_he") or fallback["description_he"],
-            "ingredients_he": data.get("ingredients_he") or fallback["ingredients_he"]
+            "name_he": post_process_hebrew(data.get("name_he") or fallback["name_he"]),
+            "description_he": post_process_hebrew(data.get("description_he") or fallback["description_he"]),
+            "ingredients_he": post_process_hebrew(data.get("ingredients_he") or fallback["ingredients_he"])
         }
 
     except Exception:
@@ -298,12 +374,17 @@ def normalize_dish(raw):
     kosher = map_kosher(category, raw_kosher)
 
     raw_ingredients = clean_text(raw.get("ingredients", ""))
+    name_en = clean_text(raw.get("name", ""))
+    description_en = clean_text(raw.get("description", ""))
+
+    if is_bad_generic_description(description_en, name_en, category):
+        description_en = ""
 
     dish = {
         "category": category,
         "kosher": kosher,
-        "name_en": clean_text(raw.get("name", "")),
-        "description_en": clean_text(raw.get("description", "")),
+        "name_en": name_en,
+        "description_en": description_en,
         "ingredients_en": clean_ingredients_for_display(raw_ingredients),
         "price": raw.get("price", "55")
     }
