@@ -21,27 +21,25 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
-
 
 MEAT_STATIONS = ["grill", "chef special", "sandwich", "soup", "sushi"]
 DAIRY_STATIONS = ["fish special", "pizza", "bakery", "veg", "vegan", "vegetarian"]
 
 ALLERGEN_PATTERNS = {
-    r"\bgluten\b": "גלוטן",
-    r"\bwheat\b": "חיטה",
-    r"\begg\b|\beggs\b": "ביצים",
-    r"\bmilk\b|\bdairy\b": "חלב",
-    r"\bsoy\b|\bsoya\b": "סויה",
-    r"\bsesame\b": "שומשום",
-    r"\bmustard\b": "חרדל",
-    r"\blupin\b": "לופין",
-    r"\bfish\b": "דגים",
-    r"\bnut\b|\bnuts\b": "אגוזים",
-    r"\bpeanut\b|\bpeanuts\b": "בוטנים",
-    r"\bcelery\b": "סלרי",
-    r"\bsulfites\b|\bsulphites\b": "סולפיטים",
+    r"\bgluten\b": ("Gluten", "גלוטן"),
+    r"\bwheat\b": ("Wheat", "חיטה"),
+    r"\begg\b|\beggs\b": ("Eggs", "ביצים"),
+    r"\bmilk\b|\bdairy\b": ("Milk", "חלב"),
+    r"\bsoy\b|\bsoya\b": ("Soy", "סויה"),
+    r"\bsesame\b": ("Sesame", "שומשום"),
+    r"\bmustard\b": ("Mustard", "חרדל"),
+    r"\blupin\b": ("Lupin", "לופין"),
+    r"\bfish\b": ("Fish", "דגים"),
+    r"\bnut\b|\bnuts\b": ("Nuts", "אגוזים"),
+    r"\bpeanut\b|\bpeanuts\b": ("Peanuts", "בוטנים"),
+    r"\bcelery\b": ("Celery", "סלרי"),
+    r"\bsulfites\b|\bsulphites\b": ("Sulfites", "סולפיטים"),
 }
 
 
@@ -49,7 +47,7 @@ def clean_text(text):
     if not text:
         return ""
     text = text.replace("\r", "\n")
-    text = re.sub(r"\n{2,}", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = text.replace("and and", "and")
     text = text.replace("beaf", "beef")
@@ -64,7 +62,7 @@ def clean_ingredients_for_display(ingredients):
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
     ingredients = re.sub(r"\s{2,}", " ", ingredients)
-    return clean_text(ingredients)
+    return clean_text(ingredients).strip(" ,.")
 
 
 def split_category(raw):
@@ -100,20 +98,30 @@ def map_kosher(category, raw_kosher=""):
 
 def extract_allergens(text):
     text_l = (text or "").lower()
-    found = []
+    found_en = []
+    found_he = []
 
-    for pattern, hebrew in ALLERGEN_PATTERNS.items():
-        if re.search(pattern, text_l) and hebrew not in found:
-            found.append(hebrew)
-
-    order = [
+    order_he = [
         "גלוטן", "חיטה", "ביצים", "חלב", "דגים", "סויה",
         "שומשום", "חרדל", "לופין", "אגוזים", "בוטנים",
         "סלרי", "סולפיטים"
     ]
-    found.sort(key=lambda x: order.index(x) if x in order else 999)
 
-    return ", ".join(found)
+    for pattern, (en, he) in ALLERGEN_PATTERNS.items():
+        if re.search(pattern, text_l):
+            if en not in found_en:
+                found_en.append(en)
+            if he not in found_he:
+                found_he.append(he)
+
+    combined = list(zip(found_en, found_he))
+    combined.sort(key=lambda pair: order_he.index(pair[1]) if pair[1] in order_he else 999)
+
+    return {
+        "allergens_en": ", ".join([x[0] for x in combined]),
+        "allergens_he": ", ".join([x[1] for x in combined]),
+        "allergens": ", ".join([x[1] for x in combined])
+    }
 
 
 def extract_text_from_pdf(path):
@@ -131,6 +139,15 @@ def is_category_line(line):
     return "(" in line and ")" in line and ("meat" in l or "dairy" in l)
 
 
+def is_price_line(line):
+    return bool(re.search(r"₪\s*\d+", line) or re.fullmatch(r"\d+(\.\d+)?", line))
+
+
+def clean_price(line):
+    price = re.sub(r"[^\d.]", "", line or "")
+    return price.replace(".00", "").strip() or "55"
+
+
 def parse_text(text):
     text = clean_text(text)
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -138,6 +155,7 @@ def parse_text(text):
     dishes = []
     current = None
     ingredient_mode = False
+    description_mode = False
 
     for line in lines:
 
@@ -154,37 +172,46 @@ def parse_text(text):
             }
 
             ingredient_mode = False
+            description_mode = False
             continue
 
         if current is None:
             continue
 
-        # price, including ₪43.00 / ₪55 / 43.00
-        if re.search(r"₪\s*\d+", line) or re.fullmatch(r"\d+(\.\d+)?", line):
-            price = re.sub(r"[^\d.]", "", line)
-            current["price"] = price.replace(".00", "")
+        if is_price_line(line):
+            current["price"] = clean_price(line)
             ingredient_mode = False
+            description_mode = True
             continue
 
-        # ingredients
         if line.lower().startswith("ingredients"):
-            current["ingredients"] = line.split(":", 1)[-1].strip() if ":" in line else ""
+            ing = line.split(":", 1)[-1].strip() if ":" in line else ""
+            current["ingredients"] = ing
             ingredient_mode = True
+            description_mode = False
             continue
 
         if ingredient_mode:
             current["ingredients"] += " " + line
             continue
 
-        # name
         if not current["name"]:
             current["name"] = line
             continue
 
-        # description
-        if not current["description"] and line != current["name"]:
-            current["description"] = line
+        # The Apple page repeats the dish name right before Ingredients.
+        # When that happens, stop collecting description.
+        if line == current["name"]:
+            description_mode = False
             continue
+
+        # After price, collect all description lines until repeated name / Ingredients.
+        if description_mode:
+            current["description"] += (" " if current["description"] else "") + line
+            continue
+
+        if not current["description"]:
+            current["description"] = line
 
     if current and current.get("name"):
         dishes.append(current)
@@ -281,10 +308,8 @@ def normalize_dish(raw):
         "price": raw.get("price", "55")
     }
 
-    # Allergens are extracted from the original ingredients, including parentheses
-    dish["allergens"] = extract_allergens(
-        f"{raw_ingredients} {dish['description_en']}"
-    )
+    allergens = extract_allergens(raw_ingredients)
+    dish.update(allergens)
 
     ai = enhance_with_ai(dish)
 
@@ -339,8 +364,7 @@ def enhance():
         "name_en": data.get("name_en", ""),
         "description_en": data.get("description_en", ""),
         "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
-        "price": data.get("price", "55"),
-        "allergens": data.get("allergens", "")
+        "price": data.get("price", "55")
     }
 
     ai = enhance_with_ai(fixed)
@@ -369,6 +393,8 @@ def create_display():
         "ingredients_he": data.get("ingredients_he", ""),
         "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
         "allergens": data.get("allergens", ""),
+        "allergens_en": data.get("allergens_en", ""),
+        "allergens_he": data.get("allergens_he", ""),
         "price": data.get("price", "55")
     }
 
