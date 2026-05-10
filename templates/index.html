@@ -1,345 +1,370 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caffè Macs Display Generator</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Caffè Macs Display Generator</title>
 
-  <style>
-    * { box-sizing: border-box; }
+<style>
+* { box-sizing: border-box; }
 
-    body {
-      margin: 0;
-      background: #ececef;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      color: #1d1d1f;
-      padding: 24px;
-    }
+body {
+  margin: 0;
+  background: #ececef;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: #1d1d1f;
+  padding: 24px;
+}
 
-    .app {
-      display: grid;
-      grid-template-columns: 0.95fr 1.05fr;
-      gap: 24px;
-      align-items: start;
-    }
+.app {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 24px;
+  align-items: start;
+}
 
-    .left-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
+.left-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
 
-    .panel {
-      background: #ffffff;
-      border-radius: 20px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.06);
-      padding: 22px;
-    }
+.panel {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+  padding: 22px;
+}
 
-    .panel h2 {
-      margin: 0 0 6px;
-      font-size: 21px;
-      letter-spacing: -0.02em;
-    }
+.panel h2 {
+  margin: 0 0 6px;
+  font-size: 21px;
+}
 
-    .panel .hint {
-      margin: 0 0 18px;
-      color: #6e6e73;
-      font-size: 14px;
-      line-height: 1.45;
-    }
+.hint {
+  margin: 0 0 18px;
+  color: #6e6e73;
+  font-size: 14px;
+}
 
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 750;
-      color: #6e6e73;
-      margin: 0 0 7px;
-    }
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 750;
+  color: #6e6e73;
+  margin-bottom: 7px;
+}
 
-    input, textarea, select {
-      width: 100%;
-      border: 1px solid #d2d2d7;
-      border-radius: 12px;
-      padding: 11px 12px;
-      font-size: 14px;
-      background: #ffffff;
-      margin-bottom: 14px;
-      outline: none;
-    }
+input, textarea, select {
+  width: 100%;
+  border: 1px solid #d2d2d7;
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 14px;
+  background: #ffffff;
+  margin-bottom: 14px;
+}
 
-    input:focus, textarea:focus, select:focus {
-      border-color: #0071e3;
-      box-shadow: 0 0 0 3px rgba(0,113,227,0.12);
-    }
+textarea {
+  min-height: 76px;
+  resize: vertical;
+}
 
-    textarea {
-      min-height: 76px;
-      resize: vertical;
-      line-height: 1.45;
-    }
+.raw-textarea {
+  min-height: 185px;
+  font-family: monospace;
+  font-size: 13px;
+}
 
-    .raw-textarea {
-      min-height: 185px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
-    }
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
-    .button-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 2px;
-    }
+button {
+  border: none;
+  border-radius: 999px;
+  background: #0071e3;
+  color: white;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
 
-    button {
-      border: none;
-      border-radius: 999px;
-      background: #0071e3;
-      color: white;
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 750;
-      cursor: pointer;
-    }
+button.secondary {
+  background: #e8e8ed;
+  color: #1d1d1f;
+}
 
-    button.secondary {
-      background: #e8e8ed;
-      color: #1d1d1f;
-    }
+button.small {
+  padding: 7px 12px;
+  font-size: 12px;
+}
 
-    button.small {
-      padding: 7px 12px;
-      font-size: 12px;
-    }
+.results-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
 
-    .results-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 16px;
-    }
+.result-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #eeeeF2;
+  background: #fbfbfd;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
 
-    .result-item {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: center;
-      border: 1px solid #eeeeF2;
-      background: #fbfbfd;
-      border-radius: 14px;
-      padding: 12px 14px;
-    }
+.result-title {
+  font-weight: 760;
+  margin-bottom: 4px;
+}
 
-    .result-title {
-      font-weight: 760;
-      margin-bottom: 4px;
-    }
+.result-meta {
+  color: #6e6e73;
+  font-size: 13px;
+}
 
-    .result-meta {
-      color: #6e6e73;
-      font-size: 13px;
-    }
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 
-    .form-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+.read-only {
+  background: #f5f5f7;
+  color: #515154;
+}
 
-    .read-only {
-      background: #f5f5f7;
-      color: #515154;
-    }
+.section-title {
+  margin: 22px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid #eeeeF2;
+  font-size: 16px;
+  font-weight: 820;
+}
 
-    .section-title {
-      margin: 22px 0 12px;
-      padding-top: 18px;
-      border-top: 1px solid #eeeeF2;
-      font-size: 16px;
-      font-weight: 820;
-    }
+.right-preview {
+  position: sticky;
+  top: 24px;
+}
 
-    .right-preview {
-      position: sticky;
-      top: 24px;
-    }
+/* FINAL DISPLAY TEMPLATE */
 
-    /* ===== FINAL DISPLAY TEMPLATE ===== */
+.page-wrap {
+  width: 100%;
+  min-height: 980px;
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 18px 55px rgba(0,0,0,0.14);
+  padding: 42px 48px 36px;
+  position: relative;
+  overflow: hidden;
+}
 
-    .page-wrap {
-      width: 100%;
-      min-height: 980px;
-      background: #ffffff;
-      border-radius: 28px;
-      box-shadow: 0 18px 55px rgba(0,0,0,0.14);
-      padding: 42px 48px 36px;
-      position: relative;
-      overflow: hidden;
-    }
+.top-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: #8e8e93;
+}
 
-    .top-accent {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 10px;
-      background: #d70015;
-    }
+.brand-title {
+  text-align: center;
+  margin: 8px 0 28px;
+}
 
-    .brand-title {
-      text-align: center;
-      margin: 8px 0 28px;
-    }
+.brand-title .main {
+  font-size: 34px;
+  font-weight: 860;
+}
 
-    .brand-title .main {
-      font-size: 34px;
-      font-weight: 860;
-      letter-spacing: -0.04em;
-    }
+.header-card {
+  border: 1px solid #e5e5ea;
+  background: #f8f8fa;
+  border-radius: 24px;
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 38px;
+}
 
-    .header-card {
-      border: 1px solid #e5e5ea;
-      background: #f8f8fa;
-      border-radius: 24px;
-      padding: 22px 24px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 16px;
-      align-items: center;
-      margin-bottom: 38px;
-    }
+.station-line {
+  font-size: 21px;
+  font-weight: 760;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
-    .station-line {
-      font-size: 21px;
-      font-weight: 760;
-      letter-spacing: -0.02em;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+.station-he {
+  direction: rtl;
+  color: #515154;
+  font-weight: 680;
+}
 
-    .station-he {
-      direction: rtl;
-      color: #515154;
-      font-weight: 680;
-    }
+.meta-line {
+  margin-top: 10px;
+}
 
-    .meta-line {
-      margin-top: 10px;
-    }
+.kosher-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 750;
+  font-size: 15px;
+}
 
-    .kosher-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      background: #ffe5e5;
-      color: #b00020;
-      font-weight: 750;
-      font-size: 15px;
-    }
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
 
-    .dot {
-      width: 10px;
-      height: 10px;
-      background: #d70015;
-      border-radius: 50%;
-      display: inline-block;
-    }
+.price {
+  font-size: 42px;
+  font-weight: 820;
+  color: #111111;
+  white-space: nowrap;
+}
 
-    .price {
-      font-size: 42px;
-      font-weight: 820;
-      letter-spacing: -0.04em;
-      color: #111111;
-      white-space: nowrap;
-    }
+.section {
+  margin-bottom: 36px;
+}
 
-    .dish-name-en {
-      font-size: 34px;
-      font-weight: 820;
-      margin-bottom: 14px;
-    }
+.section-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+}
 
-    .dish-name-he {
-      direction: rtl;
-      text-align: right;
-      font-size: 36px;
-      font-weight: 830;
-      margin-bottom: 14px;
-    }
+.section-head::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e5ea;
+}
 
-    .description {
-      font-size: 20px;
-      line-height: 1.48;
-      margin-bottom: 24px;
-    }
+.section-head.he {
+  direction: rtl;
+}
 
-    .description.he {
-      direction: rtl;
-      text-align: right;
-    }
+.section-head.he::before {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e5ea;
+}
 
-    .label-preview {
-      font-size: 14px;
-      font-weight: 780;
-      color: #6e6e73;
-      margin-bottom: 8px;
-    }
+.section-head.he::after {
+  display: none;
+}
 
-    .label-preview.he {
-      direction: rtl;
-      text-align: right;
-    }
+.dish-name-en {
+  font-size: 34px;
+  font-weight: 820;
+  margin-bottom: 14px;
+}
 
-    .ingredients {
-      font-size: 16.5px;
-      line-height: 1.55;
-      background: #fbfbfd;
-      border: 1px solid #eeeeF2;
-      border-radius: 18px;
-      padding: 16px 18px;
-    }
+.dish-name-he {
+  direction: rtl;
+  text-align: right;
+  font-size: 36px;
+  font-weight: 830;
+  margin-bottom: 14px;
+}
 
-    .ingredients.he {
-      direction: rtl;
-      text-align: right;
-    }
+.description {
+  font-size: 20px;
+  line-height: 1.48;
+  color: #2c2c2e;
+  margin-bottom: 24px;
+}
 
-    .divider {
-      height: 1px;
-      background: #e5e5ea;
-      margin: 28px 0 34px;
-    }
+.description.he {
+  direction: rtl;
+  text-align: right;
+}
 
-    .allergen-card {
-      margin-top: 34px;
-      border-radius: 22px;
-      border: 1px solid #ffd6d6;
-      background: #fff8f8;
-      padding: 20px 22px;
-    }
+.label-preview {
+  font-size: 14px;
+  font-weight: 780;
+  color: #6e6e73;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
 
-    .allergen-title {
-      font-size: 18px;
-      font-weight: 800;
-      color: #b00020;
-      margin-bottom: 12px;
-    }
+.label-preview.he {
+  direction: rtl;
+  display: block;
+  text-align: right;
+  text-transform: none;
+}
 
-    .allergen-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
+.ingredients {
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: #3a3a3c;
+  background: #fbfbfd;
+  border: 1px solid #eeeeF2;
+  border-radius: 18px;
+  padding: 16px 18px;
+}
 
-    .allergen-text.he {
-      direction: rtl;
-      text-align: right;
-    }
-  </style>
+.ingredients.he {
+  direction: rtl;
+  text-align: right;
+}
+
+.divider {
+  height: 1px;
+  background: #e5e5ea;
+  margin: 28px 0 34px;
+}
+
+.allergen-card {
+  margin-top: 34px;
+  border-radius: 22px;
+  border: 1px solid #ffd6d6;
+  background: #fff8f8;
+  padding: 20px 22px;
+}
+
+.allergen-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #b00020;
+  margin-bottom: 12px;
+}
+
+.allergen-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.allergen-text {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.allergen-text.he {
+  direction: rtl;
+  text-align: right;
+}
+</style>
 </head>
 
 <body>
@@ -350,32 +375,28 @@
 
     <section class="panel">
       <h2>1. Extract from Apple Menu</h2>
-
-      <p class="hint">
-        מדביקים כאן את הטקסט המלא מה-PDF או מהמערכת.
-      </p>
+      <p class="hint">מדביקים כאן את הטקסט המלא מה-PDF או מהמערכת. אחרי Extract בוחרים מנה והיא נטענת לעריכה ידנית.</p>
 
       <label>Paste full Apple menu text</label>
-
-      <textarea class="raw-textarea"></textarea>
+      <textarea id="fullText" class="raw-textarea"></textarea>
 
       <div class="button-row">
-        <button>Extract Menu</button>
-        <button class="secondary">Clear Text</button>
+        <button onclick="extractMenu()">Extract Menu</button>
+        <button class="secondary" onclick="clearText()">Clear Text</button>
       </div>
 
+      <div id="status" class="hint" style="margin-top:12px;"></div>
+      <div id="results" class="results-list"></div>
     </section>
 
     <section class="panel">
-
       <h2>2. Manual Editor</h2>
+      <p class="hint">אפשר לערוך מנה שהגיעה מה-Extract או להזין הכל ידנית מאפס.</p>
 
       <div class="form-grid-2">
-
         <div>
-          <label>Category</label>
-
-          <select>
+          <label>Category - בחירה מתוך רשימה</label>
+          <select id="category" onchange="applyCategory(); updatePreview();">
             <option>Grill</option>
             <option>Chef Special</option>
             <option>Sandwich</option>
@@ -390,142 +411,316 @@
         </div>
 
         <div>
-          <label>Price</label>
-          <input value="43">
+          <label>Price - נשלף אוטומטית או ידני</label>
+          <input id="price" oninput="updatePreview()" placeholder="55">
         </div>
-
       </div>
 
-      <label>Kosher - Auto</label>
-      <input class="read-only" value="Meat | בשרי" readonly>
+      <label>Kosher - אוטומטי לפי קטגוריה</label>
+      <input id="kosher" class="read-only" readonly>
 
       <div class="section-title">English</div>
 
       <label>Dish Name EN</label>
-      <input value="Hamburger & Fried Egg">
+      <input id="nameEn" oninput="updatePreview()">
 
       <label>Description EN</label>
-      <textarea>Hamburger with fried egg in a bun, served with vegetables and french fries.</textarea>
+      <textarea id="descEn" oninput="updatePreview()"></textarea>
 
-      <label>Ingredients EN</label>
-      <textarea>All-natural beef, bread, wheat flour, egg, potatoes, pickled cucumber.</textarea>
+      <label>Ingredients EN - מכאן המערכת מפיקה אלרגנים</label>
+      <textarea id="ingEn" oninput="updateAllergens(); updatePreview();"></textarea>
 
       <div class="section-title">עברית</div>
 
       <label>שם מנה בעברית</label>
-      <input dir="rtl" value="המבורגר וביצת עין">
+      <input id="nameHe" dir="rtl" oninput="updatePreview()">
 
       <label>תיאור בעברית</label>
-      <textarea dir="rtl">המבורגר בלחמנייה עם ביצת עין וצ׳יפס.</textarea>
+      <textarea id="descHe" dir="rtl" oninput="updatePreview()"></textarea>
 
       <label>מרכיבים בעברית</label>
-      <textarea dir="rtl">בקר, לחם, קמח חיטה, ביצים, תפוחי אדמה.</textarea>
+      <textarea id="ingHe" dir="rtl" oninput="updatePreview()"></textarea>
 
       <div class="section-title">Allergens - Auto</div>
 
-      <label>Allergens EN</label>
-      <input class="read-only" value="Wheat, Gluten, Eggs">
+      <label>Allergens EN - אוטומטי מתוך Ingredients EN</label>
+      <input id="allEn" class="read-only" readonly>
 
-      <label>אלרגנים בעברית</label>
-      <input class="read-only" dir="rtl" value="חיטה, גלוטן, ביצים">
+      <label>אלרגנים בעברית - אוטומטי</label>
+      <input id="allHe" class="read-only" dir="rtl" readonly>
 
       <div class="button-row">
-        <button>Update Preview</button>
-        <button class="secondary">Enhance Hebrew with AI</button>
+        <button onclick="updatePreview()">Update Preview</button>
+        <button class="secondary" onclick="enhanceHebrew()">Enhance Hebrew with AI</button>
+        <button class="secondary" onclick="resetEditor()">Reset Editor</button>
       </div>
-
     </section>
 
   </div>
 
-  <!-- RIGHT -->
-
   <aside class="right-preview">
-
     <main class="page-wrap">
-
-      <div class="top-accent"></div>
+      <div id="accent" class="top-accent"></div>
 
       <header class="brand-title">
         <div class="main">Caffè Macs</div>
       </header>
 
       <section class="header-card">
-
         <div>
-
           <div class="station-line">
-            <span>Grill</span>
+            <span id="catEnView">Category</span>
             <span>|</span>
-            <span class="station-he">גריל</span>
+            <span id="catHeView" class="station-he">קטגוריה</span>
           </div>
 
           <div class="meta-line">
-            <span class="kosher-badge">
-              <span class="dot"></span>
-              Meat | בשרי
+            <span id="kosherBadge" class="kosher-badge">
+              <span id="kosherDot" class="dot"></span>
+              <span id="kosherView">Kosher | כשרות</span>
             </span>
           </div>
-
         </div>
 
-        <div class="price">₪43</div>
-
+        <div id="priceView" class="price">₪55</div>
       </section>
 
-      <div class="dish-name-en">Hamburger & Fried Egg</div>
-
-      <div class="description">
-        Hamburger with fried egg in a bun, served with vegetables and french fries.
-      </div>
-
-      <div class="label-preview">Ingredients</div>
-
-      <div class="ingredients">
-        All-natural beef, bread, wheat flour, egg, potatoes, pickled cucumber.
-      </div>
+      <section class="section">
+        <div class="section-head"></div>
+        <div id="nameEnView" class="dish-name-en">Dish Name</div>
+        <div id="descEnView" class="description">Description will appear here.</div>
+        <div class="label-preview">Ingredients</div>
+        <div id="ingEnView" class="ingredients">Ingredients will appear here.</div>
+      </section>
 
       <div class="divider"></div>
 
-      <div class="dish-name-he">
-        המבורגר וביצת עין
-      </div>
-
-      <div class="description he">
-        המבורגר בלחמנייה עם ביצת עין וצ׳יפס.
-      </div>
-
-      <div class="label-preview he">מרכיבים</div>
-
-      <div class="ingredients he">
-        בקר, לחם, קמח חיטה, ביצים, תפוחי אדמה.
-      </div>
-
-      <section class="allergen-card">
-
-        <div class="allergen-title">
-          Allergens / אלרגנים
-        </div>
-
-        <div class="allergen-grid">
-
-          <div>
-            Wheat, Gluten, Eggs
-          </div>
-
-          <div class="allergen-text he">
-            חיטה, גלוטן, ביצים
-          </div>
-
-        </div>
-
+      <section class="section">
+        <div class="section-head he"></div>
+        <div id="nameHeView" class="dish-name-he">שם מנה</div>
+        <div id="descHeView" class="description he">תיאור המנה יופיע כאן.</div>
+        <div class="label-preview he">מרכיבים</div>
+        <div id="ingHeView" class="ingredients he">מרכיבים יופיעו כאן.</div>
       </section>
 
+      <section class="allergen-card">
+        <div class="allergen-title">Allergens / אלרגנים</div>
+        <div class="allergen-grid">
+          <div id="allEnView" class="allergen-text">None</div>
+          <div id="allHeView" class="allergen-text he">ללא</div>
+        </div>
+      </section>
     </main>
-
   </aside>
 
 </div>
+
+<script>
+const categoryMap = {
+  "Grill": {he:"גריל", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Chef Special": {he:"ספיישל שף", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Sandwich": {he:"כריכים", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Soup": {he:"מרקים", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Fish Special": {he:"ספיישל דגים", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
+  "Pizza": {he:"פיצה", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
+  "Bakery": {he:"מאפייה", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
+  "Veg/Vegan": {he:"צמחוני / טבעוני", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
+  "Sushi": {he:"סושי", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Salad Bar": {he:"סלט בר", kosherEn:"Manual", kosherHe:"ידני", color:"#8e8e93", bg:"#f2f2f7", text:"#6e6e73"}
+};
+
+const allergenMap = [
+  {keys:["gluten"], en:"Gluten", he:"גלוטן"},
+  {keys:["wheat"], en:"Wheat", he:"חיטה"},
+  {keys:["egg","eggs"], en:"Eggs", he:"ביצים"},
+  {keys:["milk","dairy"], en:"Milk", he:"חלב"},
+  {keys:["fish"], en:"Fish", he:"דגים"},
+  {keys:["soy","soya"], en:"Soy", he:"סויה"},
+  {keys:["sesame"], en:"Sesame", he:"שומשום"},
+  {keys:["mustard"], en:"Mustard", he:"חרדל"},
+  {keys:["lupin"], en:"Lupin", he:"לופין"},
+  {keys:["peanut","peanuts"], en:"Peanuts", he:"בוטנים"},
+  {keys:["nut","nuts"], en:"Nuts", he:"אגוזים"},
+  {keys:["celery"], en:"Celery", he:"סלרי"},
+  {keys:["sulfites","sulphites"], en:"Sulfites", he:"סולפיטים"}
+];
+
+function cleanPrice(value) {
+  if (!value) return "";
+  return String(value).replace("₪", "").replace(".00", "").trim();
+}
+
+function applyCategory() {
+  const cat = document.getElementById("category").value;
+  const data = categoryMap[cat];
+
+  document.getElementById("kosher").value = `${data.kosherEn} | ${data.kosherHe}`;
+
+  document.getElementById("accent").style.background = data.color;
+  document.getElementById("kosherBadge").style.background = data.bg;
+  document.getElementById("kosherBadge").style.color = data.text;
+  document.getElementById("kosherDot").style.background = data.color;
+}
+
+function updateAllergens() {
+  const text = document.getElementById("ingEn").value.toLowerCase();
+  const foundEn = [];
+  const foundHe = [];
+
+  allergenMap.forEach(item => {
+    const hit = item.keys.some(k => new RegExp("\\b" + k + "\\b").test(text));
+    if (hit) {
+      foundEn.push(item.en);
+      foundHe.push(item.he);
+    }
+  });
+
+  document.getElementById("allEn").value = foundEn.join(", ");
+  document.getElementById("allHe").value = foundHe.join(", ");
+}
+
+function updatePreview() {
+  applyCategory();
+
+  const cat = document.getElementById("category").value;
+  const data = categoryMap[cat];
+
+  document.getElementById("catEnView").innerText = cat;
+  document.getElementById("catHeView").innerText = data.he;
+  document.getElementById("kosherView").innerText = `${data.kosherEn} | ${data.kosherHe}`;
+
+  const price = cleanPrice(document.getElementById("price").value) || "55";
+  document.getElementById("priceView").innerText = `₪${price}`;
+
+  document.getElementById("nameEnView").innerText = document.getElementById("nameEn").value || "Dish Name";
+  document.getElementById("descEnView").innerText = document.getElementById("descEn").value || "Description will appear here.";
+  document.getElementById("ingEnView").innerText = document.getElementById("ingEn").value || "Ingredients will appear here.";
+
+  document.getElementById("nameHeView").innerText = document.getElementById("nameHe").value || "שם מנה";
+  document.getElementById("descHeView").innerText = document.getElementById("descHe").value || "תיאור המנה יופיע כאן.";
+  document.getElementById("ingHeView").innerText = document.getElementById("ingHe").value || "מרכיבים יופיעו כאן.";
+
+  document.getElementById("allEnView").innerText = document.getElementById("allEn").value || "None";
+  document.getElementById("allHeView").innerText = document.getElementById("allHe").value || "ללא";
+}
+
+function normalizeCategory(raw) {
+  if (!raw) return "Grill";
+  const clean = raw.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+  for (const cat of Object.keys(categoryMap)) {
+    if (clean.includes(cat.toLowerCase())) return cat;
+  }
+
+  return "Grill";
+}
+
+function fillForm(d) {
+  const category = normalizeCategory(d.category || "");
+  document.getElementById("category").value = category;
+
+  document.getElementById("price").value = cleanPrice(d.price || "");
+  document.getElementById("nameEn").value = d.name_en || "";
+  document.getElementById("descEn").value = d.description_en || "";
+  document.getElementById("ingEn").value = d.ingredients_en || "";
+  document.getElementById("nameHe").value = d.name_he || "";
+  document.getElementById("descHe").value = d.description_he || "";
+  document.getElementById("ingHe").value = d.ingredients_he || "";
+
+  updateAllergens();
+  updatePreview();
+}
+
+async function extractMenu() {
+  const rawText = document.getElementById("fullText").value;
+  const status = document.getElementById("status");
+  const results = document.getElementById("results");
+
+  status.innerText = "Extracting...";
+  results.innerHTML = "";
+
+  try {
+    const res = await fetch("/extract", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ text: rawText })
+    });
+
+    const data = await res.json();
+    const dishes = data.dishes || [];
+
+    dishes.forEach((dish, index) => {
+      const item = document.createElement("div");
+      item.className = "result-item";
+
+      item.innerHTML = `
+        <div>
+          <div class="result-title">${dish.name_he || dish.name_en || "Dish " + (index + 1)}</div>
+          <div class="result-meta">${dish.category || ""} | ${dish.kosher || ""} | ₪${cleanPrice(dish.price || "")}</div>
+        </div>
+        <button class="small secondary">Load to Editor</button>
+      `;
+
+      item.querySelector("button").onclick = () => fillForm(dish);
+      results.appendChild(item);
+    });
+
+    if (dishes.length > 0) {
+      fillForm(dishes[0]);
+    }
+
+    status.innerText = `Found ${dishes.length} dishes.`;
+  } catch (error) {
+    console.error(error);
+    status.innerText = "Extract failed.";
+  }
+}
+
+async function enhanceHebrew() {
+  const payload = {
+    category: document.getElementById("category").value,
+    name_en: document.getElementById("nameEn").value,
+    description_en: document.getElementById("descEn").value,
+    ingredients_en: document.getElementById("ingEn").value,
+    price: document.getElementById("price").value
+  };
+
+  try {
+    const res = await fetch("/enhance", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (data.success && data.dish) {
+      document.getElementById("nameHe").value = data.dish.name_he || "";
+      document.getElementById("descHe").value = data.dish.description_he || "";
+      document.getElementById("ingHe").value = data.dish.ingredients_he || "";
+      updatePreview();
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function clearText() {
+  document.getElementById("fullText").value = "";
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("status").innerText = "";
+}
+
+function resetEditor() {
+  document.querySelectorAll("#nameEn, #descEn, #ingEn, #nameHe, #descHe, #ingHe, #price").forEach(el => el.value = "");
+  document.getElementById("category").value = "Grill";
+  updateAllergens();
+  updatePreview();
+}
+
+applyCategory();
+updatePreview();
+</script>
 
 </body>
 </html>
