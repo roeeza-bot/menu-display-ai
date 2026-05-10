@@ -57,6 +57,16 @@ def clean_text(text):
     return text.strip()
 
 
+def clean_ingredients_for_display(ingredients):
+    if not ingredients:
+        return ""
+    ingredients = re.sub(r"\([^)]*\)", "", ingredients)
+    ingredients = re.sub(r"\s+,", ",", ingredients)
+    ingredients = re.sub(r",\s*,", ",", ingredients)
+    ingredients = re.sub(r"\s{2,}", " ", ingredients)
+    return clean_text(ingredients)
+
+
 def split_category(raw):
     raw = clean_text(raw)
     match = re.search(r"^(.*?)\s*\((.*?)\)", raw)
@@ -96,7 +106,11 @@ def extract_allergens(text):
         if re.search(pattern, text_l) and hebrew not in found:
             found.append(hebrew)
 
-    order = ["גלוטן", "חיטה", "ביצים", "חלב", "דגים", "סויה", "שומשום", "חרדל", "לופין", "אגוזים", "בוטנים", "סלרי", "סולפיטים"]
+    order = [
+        "גלוטן", "חיטה", "ביצים", "חלב", "דגים", "סויה",
+        "שומשום", "חרדל", "לופין", "אגוזים", "בוטנים",
+        "סלרי", "סולפיטים"
+    ]
     found.sort(key=lambda x: order.index(x) if x in order else 999)
 
     return ", ".join(found)
@@ -126,6 +140,7 @@ def parse_text(text):
     ingredient_mode = False
 
     for line in lines:
+
         if is_category_line(line):
             if current and current.get("name"):
                 dishes.append(current)
@@ -137,30 +152,39 @@ def parse_text(text):
                 "ingredients": "",
                 "price": "55"
             }
+
             ingredient_mode = False
             continue
 
         if current is None:
             continue
 
-        if re.fullmatch(r"\d+(\.\d+)?", line):
-            current["price"] = line
+        # price, including ₪43.00 / ₪55 / 43.00
+        if re.search(r"₪\s*\d+", line) or re.fullmatch(r"\d+(\.\d+)?", line):
+            price = re.sub(r"[^\d.]", "", line)
+            current["price"] = price.replace(".00", "")
             ingredient_mode = False
             continue
 
+        # ingredients
         if line.lower().startswith("ingredients"):
             current["ingredients"] = line.split(":", 1)[-1].strip() if ":" in line else ""
             ingredient_mode = True
             continue
 
         if ingredient_mode:
-            current["ingredients"] += (", " if current["ingredients"] else "") + line
+            current["ingredients"] += " " + line
             continue
 
+        # name
         if not current["name"]:
             current["name"] = line
-        elif not current["description"] and line != current["name"]:
+            continue
+
+        # description
+        if not current["description"] and line != current["name"]:
             current["description"] = line
+            continue
 
     if current and current.get("name"):
         dishes.append(current)
@@ -189,26 +213,30 @@ def enhance_with_ai(dish):
     try:
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
-            temperature=0.2,
+            temperature=0.1,
             messages=[
                 {
                     "role": "system",
                     "content": """
-You are a culinary Hebrew menu display editor for Apple Herzliya Caffè Macs.
+You are a professional culinary Hebrew translator for Apple Herzliya Caffè Macs.
 Return JSON only.
 
 Rules:
-- Translate and improve only the Hebrew culinary text.
+- Translate only the Hebrew fields.
 - Do not decide kosher.
 - Do not decide station/category.
 - Do not decide allergens.
 - Do not invent ingredients.
-- Keep Hebrew professional, clear, concise, suitable for a food display.
-- Dish name should sound like a real menu item, not literal translation.
-- Description should be one short elegant sentence.
+- Do not add marketing language.
+- Do not add adjectives like delicious, delightful, rich, indulgent, exciting, amazing, unless they appear in the source.
+- Dish name should be a professional Hebrew menu name, accurate to the English.
+- Description must be an accurate translation of the English description.
+- Do not rewrite the description creatively.
+- Keep the tone neutral, professional and culinary.
 - Ingredients should be translated to Hebrew, comma separated.
 - Keep culinary terms when appropriate: טחינה, אריסה, מטבוחה, פתיתים, קובה, סינייה, בריסקט.
 - If a vegan dish is kosher dairy because of the station, do not mention parve.
+
 Return exactly:
 {
   "name_he": "...",
@@ -242,17 +270,20 @@ def normalize_dish(raw):
     category, raw_kosher = split_category(raw.get("category_raw", ""))
     kosher = map_kosher(category, raw_kosher)
 
+    raw_ingredients = clean_text(raw.get("ingredients", ""))
+
     dish = {
         "category": category,
         "kosher": kosher,
         "name_en": clean_text(raw.get("name", "")),
         "description_en": clean_text(raw.get("description", "")),
-        "ingredients_en": clean_text(raw.get("ingredients", "")),
+        "ingredients_en": clean_ingredients_for_display(raw_ingredients),
         "price": raw.get("price", "55")
     }
 
+    # Allergens are extracted from the original ingredients, including parentheses
     dish["allergens"] = extract_allergens(
-        f"{dish['ingredients_en']} {dish['description_en']}"
+        f"{raw_ingredients} {dish['description_en']}"
     )
 
     ai = enhance_with_ai(dish)
@@ -307,7 +338,7 @@ def enhance():
         "kosher": data.get("kosher", ""),
         "name_en": data.get("name_en", ""),
         "description_en": data.get("description_en", ""),
-        "ingredients_en": data.get("ingredients_en", ""),
+        "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
         "price": data.get("price", "55"),
         "allergens": data.get("allergens", "")
     }
@@ -336,7 +367,7 @@ def create_display():
         "description_he": data.get("description_he", ""),
         "description_en": data.get("description_en", ""),
         "ingredients_he": data.get("ingredients_he", ""),
-        "ingredients_en": data.get("ingredients_en", ""),
+        "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
         "allergens": data.get("allergens", ""),
         "price": data.get("price", "55")
     }
