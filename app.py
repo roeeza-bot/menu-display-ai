@@ -373,15 +373,185 @@ def parse_sushi_blocks(text):
     return dishes
 
 
+def is_full_day_station_line(line):
+    l = (line or "").strip().lower()
+
+    if is_category_line(line):
+        return True
+
+    stations = [
+        "meat station",
+        "chicken station",
+        "fish station",
+        "pizza station",
+        "sushi station",
+        "salad bar station",
+        "grill",
+        "chef special",
+        "sandwich",
+        "soup",
+        "fish special",
+        "veg/vegan",
+        "pizza",
+        "salad bar",
+        "sushi"
+    ]
+
+    return l in stations
+
+
+def next_price_index(lines, start, max_lookahead=4):
+    end = min(len(lines), start + max_lookahead + 1)
+    for i in range(start, end):
+        if is_price_line(lines[i]):
+            return i
+    return None
+
+
+def looks_like_new_dish_start(lines, index):
+    if index >= len(lines):
+        return False
+
+    line = lines[index]
+
+    if line.lower().startswith("ingredients"):
+        return False
+
+    if is_full_day_station_line(line):
+        return False
+
+    price_idx = next_price_index(lines, index, 3)
+    return price_idx is not None and price_idx > index
+
+
+def split_station_blocks(lines):
+    blocks = []
+    current_station = None
+    current_lines = []
+
+    for line in lines:
+        if is_full_day_station_line(line):
+            if current_station and current_lines:
+                blocks.append({
+                    "station": current_station,
+                    "lines": current_lines
+                })
+
+            current_station = line
+            current_lines = []
+            continue
+
+        if current_station:
+            current_lines.append(line)
+
+    if current_station and current_lines:
+        blocks.append({
+            "station": current_station,
+            "lines": current_lines
+        })
+
+    return blocks
+
+
+def parse_station_dishes(station, lines):
+    dishes = []
+    i = 0
+
+    while i < len(lines):
+        price_idx = next_price_index(lines, i, 4)
+
+        if price_idx is None:
+            i += 1
+            continue
+
+        name_lines = lines[i:price_idx]
+        name = clean_text(" ".join(name_lines))
+
+        if not name:
+            i = price_idx + 1
+            continue
+
+        price = clean_price(lines[price_idx])
+        i = price_idx + 1
+
+        description_lines = []
+        ingredients_lines = []
+        ingredient_mode = False
+
+        while i < len(lines):
+            if looks_like_new_dish_start(lines, i):
+                break
+
+            line = lines[i]
+
+            if line == name:
+                i += 1
+                continue
+
+            next_line = lines[i + 1] if i + 1 < len(lines) else ""
+
+            if (
+                not ingredient_mode
+                and len(line) < 45
+                and next_line.lower().startswith("ingredients")
+            ):
+                section_title = line
+                section_ing = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
+                ingredients_lines.append(f"{section_title}: {section_ing}")
+                ingredient_mode = True
+                i += 2
+                continue
+
+            if line.lower().startswith("ingredients"):
+                ing = line.split(":", 1)[-1].strip() if ":" in line else ""
+                ingredients_lines.append(ing)
+                ingredient_mode = True
+                i += 1
+                continue
+
+            if ingredient_mode:
+                ingredients_lines.append(line)
+            else:
+                description_lines.append(line)
+
+            i += 1
+
+        dishes.append({
+            "category_raw": station,
+            "name": name,
+            "description": clean_text(" ".join(description_lines)),
+            "ingredients": clean_text("\n".join(ingredients_lines)),
+            "price": price
+        })
+
+    return dishes
+
+
 def parse_text(text):
     text = clean_text(text)
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+    station_blocks = split_station_blocks(lines)
+
+    if len(station_blocks) > 1:
+        dishes = []
+
+        for block in station_blocks:
+            station = block["station"]
+            block_lines = block["lines"]
+
+            if is_sushi_station_line(station):
+                sushi_text = "\n".join([station] + block_lines)
+                dishes.extend(parse_sushi_blocks(sushi_text))
+            else:
+                dishes.extend(parse_station_dishes(station, block_lines))
+
+        return dishes
 
     if is_sushi_pdf(text):
         sushi_dishes = parse_sushi_blocks(text)
         if sushi_dishes:
             return sushi_dishes
-
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
 
     dishes = []
     current = None
