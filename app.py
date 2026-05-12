@@ -23,8 +23,8 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
-MEAT_STATIONS = ["grill", "chef special", "sandwich", "soup", "sushi"]
-DAIRY_STATIONS = ["fish special", "pizza", "bakery", "veg", "vegan", "vegetarian"]
+MEAT_STATIONS = ["grill", "chef special", "sandwich", "soup", "sushi", "meat station", "chicken station"]
+DAIRY_STATIONS = ["fish special", "pizza", "bakery", "veg", "vegan", "vegetarian", "fish station", "pizza station"]
 
 ALLERGEN_PATTERNS = {
     r"\bgluten\b": ("Gluten", "גלוטן"),
@@ -75,7 +75,6 @@ def clean_text(text):
 def clean_ingredients_for_display(ingredients):
     if not ingredients:
         return ""
-
     ingredients = re.sub(r"\([^)]*\)", "", ingredients)
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
@@ -163,9 +162,16 @@ def extract_text_from_pdf(path):
         return ""
 
     doc = fitz.open(path)
-    text = "\n".join(page.get_text() for page in doc)
+    pages = []
+
+    for page in doc:
+        page_text = page.get_text()
+        if page_text.strip():
+            pages.append(page_text)
+
     doc.close()
-    return text
+
+    return "\n\n__PAGE_BREAK__\n\n".join(pages)
 
 
 def extract_raw_text_from_request():
@@ -243,137 +249,7 @@ def is_sushi_station_line(line):
     return l in ["sushi", "sushi station"]
 
 
-def is_sushi_pdf(text):
-    lines = [l.strip() for l in clean_text(text).split("\n") if l.strip()]
-    return any(is_sushi_station_line(line) for line in lines)
-
-
-def is_sushi_section_title(line):
-    if not line:
-        return False
-
-    l = line.strip().lower()
-
-    blocked = [
-        "ingredients:",
-        "a freshly",
-        "served with",
-    ]
-
-    if any(l.startswith(x) for x in blocked):
-        return False
-
-    if is_price_line(line):
-        return False
-
-    if len(line) > 45:
-        return False
-
-    if "." in line or "," in line:
-        return False
-
-    return True
-
-
-def parse_sushi_blocks(text):
-    text = clean_text(text)
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-
-    sushi_start_indexes = [
-        i for i, line in enumerate(lines)
-        if is_sushi_station_line(line)
-    ]
-
-    if not sushi_start_indexes:
-        return []
-
-    blocks = []
-
-    for pos, start in enumerate(sushi_start_indexes):
-        end = sushi_start_indexes[pos + 1] if pos + 1 < len(sushi_start_indexes) else len(lines)
-        block = lines[start:end]
-        if len(block) >= 3:
-            blocks.append(block)
-
-    dishes = []
-
-    for block in blocks:
-        station = block[0].strip()
-
-        i = 1
-        while i < len(block):
-            name = block[i].strip() if i < len(block) else ""
-            next_line = block[i + 1].strip() if i + 1 < len(block) else ""
-
-            if not name or not is_price_line(next_line):
-                i += 1
-                continue
-
-            price = clean_price(next_line)
-            i += 2
-
-            description_lines = []
-            sections = []
-
-            while i < len(block):
-                line = block[i].strip()
-                following = block[i + 1].strip() if i + 1 < len(block) else ""
-
-                if is_price_line(following):
-                    break
-
-                if is_sushi_section_title(line) and following.lower().startswith("ingredients"):
-                    section_title = line
-                    ingredients_line = following.split(":", 1)[-1].strip() if ":" in following else ""
-
-                    i += 2
-                    ingredient_parts = [ingredients_line] if ingredients_line else []
-
-                    while i < len(block):
-                        current_line = block[i].strip()
-                        next_current = block[i + 1].strip() if i + 1 < len(block) else ""
-
-                        if is_sushi_section_title(current_line) and next_current.lower().startswith("ingredients"):
-                            break
-
-                        if is_price_line(next_current):
-                            break
-
-                        ingredient_parts.append(current_line)
-                        i += 1
-
-                    sections.append({
-                        "title": section_title,
-                        "ingredients": clean_text(" ".join(ingredient_parts))
-                    })
-                    continue
-
-                if not sections:
-                    description_lines.append(line)
-
-                i += 1
-
-            ingredients_lines = []
-            for section in sections:
-                title = section.get("title", "").strip()
-                ingredients = section.get("ingredients", "").strip()
-                if title and ingredients:
-                    ingredients_lines.append(f"{title}: {ingredients}")
-                elif ingredients:
-                    ingredients_lines.append(ingredients)
-
-            dishes.append({
-                "category_raw": station,
-                "name": name,
-                "description": clean_text(" ".join(description_lines)),
-                "ingredients": "\n".join(ingredients_lines).strip(),
-                "price": price
-            })
-
-    return dishes
-
-
-def is_full_day_station_line(line):
+def is_known_station_line(line):
     l = (line or "").strip().lower()
 
     if is_category_line(line):
@@ -400,7 +276,7 @@ def is_full_day_station_line(line):
     return l in stations
 
 
-def next_price_index(lines, start, max_lookahead=4):
+def is_price_near(lines, start, max_lookahead=3):
     end = min(len(lines), start + max_lookahead + 1)
     for i in range(start, end):
         if is_price_line(lines[i]):
@@ -408,109 +284,153 @@ def next_price_index(lines, start, max_lookahead=4):
     return None
 
 
-def looks_like_new_dish_start(lines, index):
-    if index >= len(lines):
+def is_probable_title_line(line):
+    if not line:
         return False
 
-    line = lines[index]
+    l = line.strip().lower()
 
-    if line.lower().startswith("ingredients"):
+    if l.startswith("ingredients"):
+        return False
+    if l.startswith("contains"):
+        return False
+    if "," in line:
+        return False
+    if line.endswith("."):
+        return False
+    if line.endswith(","):
+        return False
+    if len(line) > 65:
         return False
 
-    if is_full_day_station_line(line):
-        return False
-
-    price_idx = next_price_index(lines, index, 3)
-    return price_idx is not None and price_idx > index
+    return True
 
 
-def split_station_blocks(lines):
-    blocks = []
-    current_station = None
-    current_lines = []
+def find_dish_starts(lines):
+    starts = []
 
-    for line in lines:
-        if is_full_day_station_line(line):
-            if current_station and current_lines:
-                blocks.append({
-                    "station": current_station,
-                    "lines": current_lines
-                })
-
-            current_station = line
-            current_lines = []
+    for i in range(len(lines)):
+        if not is_probable_title_line(lines[i]):
             continue
 
-        if current_station:
-            current_lines.append(line)
+        price_idx = is_price_near(lines, i, 3)
 
-    if current_station and current_lines:
-        blocks.append({
-            "station": current_station,
-            "lines": current_lines
-        })
+        if price_idx is not None and price_idx > i:
+            starts.append((i, price_idx))
 
-    return blocks
+    cleaned = []
+    used = set()
+
+    for start, price_idx in starts:
+        if price_idx in used:
+            continue
+        cleaned.append((start, price_idx))
+        used.add(price_idx)
+
+    return cleaned
 
 
-def parse_station_dishes(station, lines):
+def parse_sushi_page(station, lines):
     dishes = []
-    i = 0
+    starts = find_dish_starts(lines)
 
-    while i < len(lines):
-        price_idx = next_price_index(lines, i, 4)
+    for idx, (start, price_idx) in enumerate(starts):
+        next_start = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
 
-        if price_idx is None:
-            i += 1
-            continue
-
-        name_lines = lines[i:price_idx]
-        name = clean_text(" ".join(name_lines))
-
-        if not name:
-            i = price_idx + 1
-            continue
-
+        name = clean_text(" ".join(lines[start:price_idx]))
         price = clean_price(lines[price_idx])
-        i = price_idx + 1
+        body = lines[price_idx + 1:next_start]
 
         description_lines = []
-        ingredients_lines = []
-        ingredient_mode = False
+        ingredient_lines = []
+        i = 0
 
-        while i < len(lines):
-            if looks_like_new_dish_start(lines, i):
-                break
+        while i < len(body):
+            line = body[i]
+            next_line = body[i + 1] if i + 1 < len(body) else ""
 
-            line = lines[i]
+            if is_probable_title_line(line) and next_line.lower().startswith("ingredients"):
+                section_title = line
+                ing = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
+                section_parts = [ing] if ing else []
+                i += 2
 
-            if line == name:
+                while i < len(body):
+                    current = body[i]
+                    following = body[i + 1] if i + 1 < len(body) else ""
+
+                    if is_probable_title_line(current) and following.lower().startswith("ingredients"):
+                        break
+
+                    section_parts.append(current)
+                    i += 1
+
+                ingredient_lines.append(f"{section_title}: {clean_text(' '.join(section_parts))}")
+                continue
+
+            if line.lower().startswith("ingredients"):
+                ing = line.split(":", 1)[-1].strip() if ":" in line else ""
+                ingredient_lines.append(ing)
                 i += 1
                 continue
 
-            next_line = lines[i + 1] if i + 1 < len(lines) else ""
+            if not ingredient_lines:
+                description_lines.append(line)
 
-            if (
-                not ingredient_mode
-                and len(line) < 45
-                and next_line.lower().startswith("ingredients")
-            ):
+            i += 1
+
+        dishes.append({
+            "category_raw": station,
+            "name": name,
+            "description": clean_text(" ".join(description_lines)),
+            "ingredients": clean_text("\n".join(ingredient_lines)),
+            "price": price
+        })
+
+    return dishes
+
+
+def parse_regular_page(station, lines):
+    dishes = []
+    starts = find_dish_starts(lines)
+
+    for idx, (start, price_idx) in enumerate(starts):
+        next_start = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
+
+        name = clean_text(" ".join(lines[start:price_idx]))
+        price = clean_price(lines[price_idx])
+        body = lines[price_idx + 1:next_start]
+
+        description_lines = []
+        ingredient_lines = []
+        ingredient_mode = False
+
+        i = 0
+        while i < len(body):
+            line = body[i]
+            next_line = body[i + 1] if i + 1 < len(body) else ""
+
+            if clean_text(line) == name:
+                i += 1
+                continue
+
+            if is_probable_title_line(line) and next_line.lower().startswith("ingredients"):
                 section_title = line
                 section_ing = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
-                ingredients_lines.append(f"{section_title}: {section_ing}")
+                ingredient_lines.append(f"{section_title}: {section_ing}")
                 ingredient_mode = True
                 i += 2
                 continue
 
             if line.lower().startswith("ingredients"):
                 ing = line.split(":", 1)[-1].strip() if ":" in line else ""
-                ingredients_lines.append(ing)
+                ingredient_lines.append(ing)
                 ingredient_mode = True
                 i += 1
                 continue
 
             if ingredient_mode:
-                ingredients_lines.append(line)
+                ingredient_lines.append(line)
             else:
                 description_lines.append(line)
 
@@ -520,38 +440,75 @@ def parse_station_dishes(station, lines):
             "category_raw": station,
             "name": name,
             "description": clean_text(" ".join(description_lines)),
-            "ingredients": clean_text("\n".join(ingredients_lines)),
+            "ingredients": clean_text("\n".join(ingredient_lines)),
             "price": price
         })
 
     return dishes
 
 
+def parse_pages_from_pdf_text(text):
+    pages = [p.strip() for p in text.split("__PAGE_BREAK__") if p.strip()]
+    dishes = []
+
+    for page in pages:
+        page = clean_text(page)
+        lines = [l.strip() for l in page.split("\n") if l.strip()]
+
+        if not lines:
+            continue
+
+        station = lines[0]
+        body_lines = lines[1:]
+
+        if not is_known_station_line(station):
+            continue
+
+        if is_sushi_station_line(station):
+            dishes.extend(parse_sushi_page(station, body_lines))
+        else:
+            dishes.extend(parse_regular_page(station, body_lines))
+
+    return dishes
+
+
 def parse_text(text):
+    if "__PAGE_BREAK__" in text:
+        page_dishes = parse_pages_from_pdf_text(text)
+        if page_dishes:
+            return page_dishes
+
     text = clean_text(text)
     lines = [l.strip() for l in text.split("\n") if l.strip()]
 
-    station_blocks = split_station_blocks(lines)
-
-    if len(station_blocks) > 1:
+    if any(is_known_station_line(l) for l in lines):
         dishes = []
+        current_station = None
+        current_lines = []
 
-        for block in station_blocks:
-            station = block["station"]
-            block_lines = block["lines"]
+        for line in lines:
+            if is_known_station_line(line):
+                if current_station and current_lines:
+                    if is_sushi_station_line(current_station):
+                        dishes.extend(parse_sushi_page(current_station, current_lines))
+                    else:
+                        dishes.extend(parse_regular_page(current_station, current_lines))
 
-            if is_sushi_station_line(station):
-                sushi_text = "\n".join([station] + block_lines)
-                dishes.extend(parse_sushi_blocks(sushi_text))
+                current_station = line
+                current_lines = []
+                continue
+
+            if current_station:
+                current_lines.append(line)
+
+        if current_station and current_lines:
+            if is_sushi_station_line(current_station):
+                dishes.extend(parse_sushi_page(current_station, current_lines))
             else:
-                dishes.extend(parse_station_dishes(station, block_lines))
+                dishes.extend(parse_regular_page(current_station, current_lines))
 
-        return dishes
-
-    if is_sushi_pdf(text):
-        sushi_dishes = parse_sushi_blocks(text)
-        if sushi_dishes:
-            return sushi_dishes
+        if dishes:
+            return dishes
 
     dishes = []
     current = None
@@ -559,7 +516,6 @@ def parse_text(text):
     description_mode = False
 
     for line in lines:
-
         if is_category_line(line):
             if current and current.get("name"):
                 dishes.append(current)
@@ -656,38 +612,11 @@ Rules:
 - Do not decide allergens.
 - Do not invent ingredients.
 - Do not add marketing language.
-- Do not add adjectives like delicious, delightful, rich, indulgent, exciting, amazing, unless they appear in the source.
-- Dish name should be a professional Hebrew menu name, accurate to the English.
-- If description_en exists, description_he must be an accurate translation of it.
-- Do not rewrite description_en creatively.
+- Dish name should be a professional Hebrew menu name.
+- If description_en exists, description_he must be an accurate translation.
 - If description_en is empty or generic, create one neutral short description using only name_en and ingredients_en.
-- Keep the tone neutral, professional and culinary.
 - Ingredients should be translated to Hebrew, comma separated.
-- Translate/normalize culinary terms consistently:
-  lemongrass / lemon grass = למון גראס
-  stracciatella = סטרצ׳יאטלה
-  yuzu = יוזו
-  miso = מיסו
-  panko = פנקו
-  aioli = איולי
-  brioche = בריוש
-  kimchi = קימצ׳י
-  shatta = שאטה
-- Keep culinary terms when appropriate: טחינה, אריסה, מטבוחה, פתיתים, קובה, סינייה, בריסקט.
-- If a vegan dish is kosher dairy because of the station, do not mention parve.
-- For sushi, keep section names clear. Examples:
-  Hosomaki = הוסומאקי
-  Maki = מאקי
-  Nigiri = ניגירי
-  Sashimi = סשימי
-  Futomaki = פוטומאקי
-  I/O roll = רול אינסייד-אאוט
-  Fried Hosomaki = הוסומאקי מטוגן
-  Sushi Rice = אורז סושי
-- For Fish Sushi translate as סושי דגים.
-- For Vegetarian Sushi translate as סושי צמחוני.
-- For Fish Combination translate as קומבינציית סושי דגים.
-- For Vegan Combination translate as קומבינציית סושי טבעונית.
+- For sushi, keep section names clear.
 
 Return exactly:
 {
@@ -771,7 +700,6 @@ def home():
 @app.route("/extract", methods=["POST"])
 def extract():
     raw_text = extract_raw_text_from_request()
-
     raw_dishes = parse_text(raw_text)
     dishes = [normalize_dish(d) for d in raw_dishes]
 
@@ -785,7 +713,6 @@ def extract():
 @app.route("/extract-full-day", methods=["POST"])
 def extract_full_day():
     raw_text = extract_raw_text_from_request()
-
     raw_dishes = parse_text(raw_text)
     dishes = [normalize_dish(d) for d in raw_dishes]
     dishes = add_batch_metadata(dishes)
