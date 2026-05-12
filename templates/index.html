@@ -96,6 +96,11 @@ button.secondary{
   color:#1d1d1f;
 }
 
+button.danger{
+  background:#ffe5e5;
+  color:#b00020;
+}
+
 .results-list{
   display:grid;
   gap:10px;
@@ -121,6 +126,34 @@ button.secondary{
   color:#6e6e73;
   font-size:13px;
   margin-top:4px;
+}
+
+.batch-toolbar{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+
+.batch-count{
+  margin-top:12px;
+  color:#6e6e73;
+  font-size:13px;
+}
+
+.batch-nav{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:10px;
+  align-items:center;
+  margin-top:14px;
+}
+
+.batch-position{
+  text-align:center;
+  color:#6e6e73;
+  font-size:13px;
+  font-weight:700;
 }
 
 .form-grid-2{
@@ -316,6 +349,15 @@ button.secondary{
   text-align:right;
 }
 
+#printAllContainer{
+  display:none;
+}
+
+.print-page{
+  page-break-after:always;
+  break-after:page;
+}
+
 @media print{
   *{
     -webkit-print-color-adjust: exact !important;
@@ -345,6 +387,20 @@ button.secondary{
     min-height:auto;
   }
 
+  body.print-all-active .app{
+    display:none;
+  }
+
+  body.print-all-active #printAllContainer{
+    display:block;
+  }
+
+  body.print-all-active .page-wrap{
+    box-shadow:none;
+    border-radius:0;
+    min-height:100vh;
+  }
+
   @page{
     size:A4 portrait;
     margin:0;
@@ -360,8 +416,32 @@ button.secondary{
 <div class="left-stack">
 
 <section class="panel">
-<h2>1. Extract from Apple Menu</h2>
-<p class="hint">מדביקים כאן טקסט מלא מתוך ה-PDF או מערכת Apple.</p>
+<h2>1. Full Day Generator</h2>
+<p class="hint">העלה PDF מלא של יום מהמערכת של Apple, והמערכת תפיק דפי Display לכל המנות.</p>
+
+<label>Upload full day Apple menu PDF</label>
+<input id="fullDayFile" type="file" accept=".pdf,.txt">
+
+<div class="button-row">
+<button onclick="generateFullDay()">Generate Full Day Displays</button>
+<button class="secondary" onclick="printCurrentDisplay()">Print Current Display</button>
+<button class="secondary" onclick="printAllDisplays()">Print All Displays</button>
+</div>
+
+<div id="fullDayStatus" class="hint" style="margin-top:12px;"></div>
+
+<div class="batch-nav">
+<button class="secondary" onclick="previousDish()">Previous</button>
+<div id="batchPosition" class="batch-position">No full day loaded</div>
+<button class="secondary" onclick="nextDish()">Next</button>
+</div>
+
+<div id="fullDayResults" class="results-list"></div>
+</section>
+
+<section class="panel">
+<h2>2. Single Dish Generator</h2>
+<p class="hint">הכלי הקיים נשאר כרגיל - הדבקת טקסט מלא מתוך PDF או מערכת Apple.</p>
 
 <label>Paste full Apple menu text</label>
 <textarea id="fullText" class="raw-textarea"></textarea>
@@ -376,13 +456,13 @@ button.secondary{
 </section>
 
 <section class="panel">
-<h2>2. Manual Editor</h2>
-<p class="hint">אפשר לערוך ידנית כל שדה בלי לשנות את העיצוב הסופי.</p>
+<h2>3. Manual Editor</h2>
+<p class="hint">אפשר לערוך ידנית כל דף. אם עבדת על Full Day, העריכה נשמרת לדף הנוכחי.</p>
 
 <div class="form-grid-2">
 <div>
 <label>Category</label>
-<select id="category" onchange="applyCategory();updatePreview();">
+<select id="category" onchange="applyCategory();updatePreview();saveCurrentDishEdit();">
 <option>Grill</option>
 <option>Chef Special</option>
 <option>Sandwich</option>
@@ -399,7 +479,7 @@ button.secondary{
 
 <div>
 <label>Price</label>
-<input id="price" oninput="updatePreview()">
+<input id="price" oninput="updatePreview();saveCurrentDishEdit();">
 </div>
 </div>
 
@@ -409,24 +489,24 @@ button.secondary{
 <div class="section-title">English</div>
 
 <label>Dish Name EN</label>
-<input id="nameEn" oninput="updatePreview()">
+<input id="nameEn" oninput="updatePreview();saveCurrentDishEdit();">
 
 <label>Description EN</label>
-<textarea id="descEn" oninput="updatePreview()"></textarea>
+<textarea id="descEn" oninput="updatePreview();saveCurrentDishEdit();"></textarea>
 
 <label>Ingredients EN</label>
-<textarea id="ingEn" oninput="updateAllergens();updatePreview();"></textarea>
+<textarea id="ingEn" oninput="updateAllergens();updatePreview();saveCurrentDishEdit();"></textarea>
 
 <div class="section-title">עברית</div>
 
 <label>שם מנה</label>
-<input id="nameHe" dir="rtl" oninput="updatePreview()">
+<input id="nameHe" dir="rtl" oninput="updatePreview();saveCurrentDishEdit();">
 
 <label>תיאור</label>
-<textarea id="descHe" dir="rtl" oninput="updatePreview()"></textarea>
+<textarea id="descHe" dir="rtl" oninput="updatePreview();saveCurrentDishEdit();"></textarea>
 
 <label>מרכיבים</label>
-<textarea id="ingHe" dir="rtl" oninput="updatePreview()"></textarea>
+<textarea id="ingHe" dir="rtl" oninput="updatePreview();saveCurrentDishEdit();"></textarea>
 
 <div class="section-title">Allergens</div>
 
@@ -437,9 +517,9 @@ button.secondary{
 <input id="allHe" readonly class="read-only" dir="rtl">
 
 <div class="button-row">
-<button onclick="updatePreview()">Update Preview</button>
+<button onclick="updatePreview();saveCurrentDishEdit();">Update Preview</button>
 <button class="secondary" onclick="enhanceHebrew()">Enhance Hebrew with AI</button>
-<button class="secondary" onclick="window.print()">Print / Export PDF</button>
+<button class="secondary" onclick="printCurrentDisplay()">Print Current Display</button>
 <button class="secondary" onclick="resetEditor()">Reset</button>
 </div>
 </section>
@@ -447,7 +527,7 @@ button.secondary{
 </div>
 
 <aside class="right-preview">
-<div class="page-wrap">
+<div class="page-wrap" id="liveDisplayPage">
 
 <div id="accent" class="top-accent"></div>
 
@@ -502,7 +582,13 @@ button.secondary{
 
 </div>
 
+<div id="printAllContainer"></div>
+
 <script>
+let batchDishes = [];
+let currentBatchIndex = -1;
+let isLoadingDish = false;
+
 const categoryMap = {
   "Grill": {he:"גריל", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
   "Chef Special": {he:"ספיישל שף", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
@@ -525,6 +611,7 @@ const allergenMap = [
   ["milk","Milk","חלב"],
   ["soy","Soy","סויה"],
   ["soya","Soy","סויה"],
+  ["soybeans","Soy","סויה"],
   ["sesame","Sesame","שומשום"],
   ["mustard","Mustard","חרדל"],
   ["lupin","Lupin","לופין"],
@@ -545,9 +632,8 @@ function normalizeIncomingCategory(category){
   if(categoryMap[raw]) return raw;
 
   if(lower.includes("sushi")) return "Sushi Station";
-
-  if(lower.includes("grill")) return "Grill";
-  if(lower.includes("chef")) return "Chef Special";
+  if(lower.includes("grill") || lower.includes("meat station")) return "Grill";
+  if(lower.includes("chef") || lower.includes("chicken station")) return "Chef Special";
   if(lower.includes("sandwich")) return "Sandwich";
   if(lower.includes("soup")) return "Soup";
   if(lower.includes("fish")) return "Fish Special";
@@ -557,6 +643,15 @@ function normalizeIncomingCategory(category){
   if(lower.includes("salad")) return "Salad Bar";
 
   return "Grill";
+}
+
+function escapeHtml(value){
+  return String(value || "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
 function applyCategory(){
@@ -618,7 +713,41 @@ function updatePreview(){
   document.getElementById("allHeView").innerText=document.getElementById("allHe").value || "";
 }
 
-function fillForm(d){
+function readFormDish(){
+  const cat = document.getElementById("category").value;
+
+  return {
+    category: cat,
+    price: document.getElementById("price").value || "",
+    name_en: document.getElementById("nameEn").value || "",
+    description_en: document.getElementById("descEn").value || "",
+    ingredients_en: document.getElementById("ingEn").value || "",
+    name_he: document.getElementById("nameHe").value || "",
+    description_he: document.getElementById("descHe").value || "",
+    ingredients_he: document.getElementById("ingHe").value || "",
+    allergens_en: document.getElementById("allEn").value || "",
+    allergens_he: document.getElementById("allHe").value || ""
+  };
+}
+
+function saveCurrentDishEdit(){
+  if(isLoadingDish) return;
+
+  if(currentBatchIndex >= 0 && batchDishes[currentBatchIndex]){
+    const current = readFormDish();
+    batchDishes[currentBatchIndex] = {
+      ...batchDishes[currentBatchIndex],
+      ...current,
+      display_title: `${current.category} - ${current.name_en}`
+    };
+    renderBatchList();
+    updateBatchPosition();
+  }
+}
+
+function fillForm(d, batchIndex = -1){
+  isLoadingDish = true;
+
   const fixedCategory = normalizeIncomingCategory(d.category);
   document.getElementById("category").value = fixedCategory;
 
@@ -635,7 +764,108 @@ function fillForm(d){
   document.getElementById("allEn").value=d.allergens_en || "";
   document.getElementById("allHe").value=d.allergens_he || "";
 
+  if(batchIndex >= 0){
+    currentBatchIndex = batchIndex;
+  }
+
   updatePreview();
+  updateBatchPosition();
+
+  isLoadingDish = false;
+}
+
+async function generateFullDay(){
+  const fileInput = document.getElementById("fullDayFile");
+  const status = document.getElementById("fullDayStatus");
+
+  if(!fileInput.files || !fileInput.files[0]){
+    status.innerText = "Please upload a full day Apple PDF first.";
+    return;
+  }
+
+  status.innerText = "Generating full day displays...";
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  try{
+    const res = await fetch("/extract-full-day",{
+      method:"POST",
+      body:formData
+    });
+
+    const data = await res.json();
+    batchDishes = data.dishes || [];
+    currentBatchIndex = batchDishes.length ? 0 : -1;
+
+    renderBatchList();
+
+    if(batchDishes.length){
+      fillForm(batchDishes[0], 0);
+    }
+
+    status.innerText = `Generated ${batchDishes.length} displays`;
+  }catch(err){
+    console.error(err);
+    status.innerText = "Full day generation failed";
+  }
+}
+
+function renderBatchList(){
+  const list = document.getElementById("fullDayResults");
+  list.innerHTML = "";
+
+  batchDishes.forEach((dish,index)=>{
+    const item = document.createElement("div");
+    item.className = "result-item";
+
+    const activeText = index === currentBatchIndex ? "Current" : "Load";
+
+    item.innerHTML = `
+      <div>
+        <div class="result-title">${escapeHtml(dish.name_he || dish.name_en)}</div>
+        <div class="result-meta">${escapeHtml(dish.category)} | ₪${escapeHtml(dish.price)} | ${index + 1}/${batchDishes.length}</div>
+      </div>
+      <button class="secondary">${activeText}</button>
+    `;
+
+    item.querySelector("button").onclick = () => {
+      saveCurrentDishEdit();
+      fillForm(batchDishes[index], index);
+    };
+
+    list.appendChild(item);
+  });
+}
+
+function updateBatchPosition(){
+  const position = document.getElementById("batchPosition");
+
+  if(!batchDishes.length || currentBatchIndex < 0){
+    position.innerText = "No full day loaded";
+    return;
+  }
+
+  const dish = batchDishes[currentBatchIndex];
+  position.innerText = `${currentBatchIndex + 1} of ${batchDishes.length} - ${dish.category} - ${dish.name_en}`;
+}
+
+function previousDish(){
+  if(!batchDishes.length) return;
+
+  saveCurrentDishEdit();
+
+  currentBatchIndex = currentBatchIndex <= 0 ? batchDishes.length - 1 : currentBatchIndex - 1;
+  fillForm(batchDishes[currentBatchIndex], currentBatchIndex);
+}
+
+function nextDish(){
+  if(!batchDishes.length) return;
+
+  saveCurrentDishEdit();
+
+  currentBatchIndex = currentBatchIndex >= batchDishes.length - 1 ? 0 : currentBatchIndex + 1;
+  fillForm(batchDishes[currentBatchIndex], currentBatchIndex);
 }
 
 async function extractMenu(){
@@ -662,8 +892,8 @@ async function extractMenu(){
 
       item.innerHTML=`
         <div>
-          <div class="result-title">${dish.name_he || dish.name_en}</div>
-          <div class="result-meta">${dish.category} | ₪${dish.price}</div>
+          <div class="result-title">${escapeHtml(dish.name_he || dish.name_en)}</div>
+          <div class="result-meta">${escapeHtml(dish.category)} | ₪${escapeHtml(dish.price)}</div>
         </div>
         <button class="secondary">Load</button>
       `;
@@ -704,6 +934,7 @@ async function enhanceHebrew(){
       document.getElementById("descHe").value=data.dish.description_he || "";
       document.getElementById("ingHe").value=data.dish.ingredients_he || "";
       updatePreview();
+      saveCurrentDishEdit();
     }
   }catch(err){
     console.error(err);
@@ -724,6 +955,89 @@ function resetEditor(){
   document.getElementById("category").value="Grill";
   updateAllergens();
   updatePreview();
+  saveCurrentDishEdit();
+}
+
+function printCurrentDisplay(){
+  document.body.classList.remove("print-all-active");
+  window.print();
+}
+
+function displayPageHtml(dish){
+  const cat = normalizeIncomingCategory(dish.category);
+  const data = categoryMap[cat] || categoryMap["Grill"];
+
+  const price = dish.price || "55";
+
+  return `
+    <div class="page-wrap print-page">
+      <div class="top-accent" style="background:${data.color};"></div>
+      <div class="display-inner">
+        <div class="brand-title">Caffè Macs</div>
+
+        <div class="header-card">
+          <div>
+            <div class="station-line">
+              <span>${escapeHtml(cat)}</span>
+              <span>|</span>
+              <span class="station-he">${escapeHtml(data.he)}</span>
+            </div>
+
+            <div class="kosher-badge" style="background:${data.bg};color:${data.text};">
+              <div class="dot" style="background:${data.color};"></div>
+              <span>${escapeHtml(data.kosherEn)} | ${escapeHtml(data.kosherHe)}</span>
+            </div>
+          </div>
+
+          <div class="price">₪${escapeHtml(price)}</div>
+        </div>
+
+        <div class="section">
+          <div class="dish-name-en">${escapeHtml(dish.name_en)}</div>
+          <div class="description">${escapeHtml(dish.description_en)}</div>
+          <div class="label-preview">Ingredients</div>
+          <div class="ingredients">${escapeHtml(dish.ingredients_en)}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="dish-name-he">${escapeHtml(dish.name_he)}</div>
+          <div class="description he">${escapeHtml(dish.description_he)}</div>
+          <div class="label-preview he">מרכיבים</div>
+          <div class="ingredients he">${escapeHtml(dish.ingredients_he)}</div>
+        </div>
+
+        <div class="allergen-card">
+          <div class="allergen-title">Allergens / אלרגנים</div>
+          <div class="allergen-grid">
+            <div>${escapeHtml(dish.allergens_en || "")}</div>
+            <div class="allergen-he">${escapeHtml(dish.allergens_he || "")}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function printAllDisplays(){
+  if(!batchDishes.length){
+    alert("No full day displays loaded.");
+    return;
+  }
+
+  saveCurrentDishEdit();
+
+  const container = document.getElementById("printAllContainer");
+  container.innerHTML = batchDishes.map(dish => displayPageHtml(dish)).join("");
+
+  document.body.classList.add("print-all-active");
+  window.print();
+
+  setTimeout(()=>{
+    document.body.classList.remove("print-all-active");
+    container.innerHTML = "";
+  }, 500);
 }
 
 applyCategory();
