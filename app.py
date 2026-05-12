@@ -31,12 +31,12 @@ ALLERGEN_PATTERNS = {
     r"\bwheat\b": ("Wheat", "חיטה"),
     r"\begg\b|\beggs\b": ("Eggs", "ביצים"),
     r"\bmilk\b|\bdairy\b": ("Milk", "חלב"),
-    r"\bsoy\b|\bsoya\b": ("Soy", "סויה"),
+    r"\bsoy\b|\bsoya\b|\bsoybeans\b": ("Soy", "סויה"),
     r"\bsesame\b": ("Sesame", "שומשום"),
     r"\bmustard\b": ("Mustard", "חרדל"),
     r"\blupin\b": ("Lupin", "לופין"),
     r"\bfish\b": ("Fish", "דגים"),
-    r"\bnut\b|\bnuts\b": ("Nuts", "אגוזים"),
+    r"\bnut\b|\bnuts\b|\btree nuts\b|\bcashew\b|\balmond\b|\bpistachio\b": ("Nuts", "אגוזים"),
     r"\bpeanut\b|\bpeanuts\b": ("Peanuts", "בוטנים"),
     r"\bcelery\b": ("Celery", "סלרי"),
     r"\bsulfites\b|\bsulphites\b": ("Sulfites", "סולפיטים"),
@@ -61,11 +61,14 @@ def clean_text(text):
     if not text:
         return ""
     text = text.replace("\r", "\n")
+    text = text.replace("", "")
+    text = text.replace("￾", "")
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = text.replace("and and", "and")
     text = text.replace("beaf", "beef")
     text = text.replace("tomatoes salad", "tomato salad")
+    text = text.replace("Ram#", "Ramen")
     return text.strip()
 
 
@@ -73,8 +76,6 @@ def clean_ingredients_for_display(ingredients):
     if not ingredients:
         return ""
 
-    # Remove allergen brackets from ingredients display only.
-    # Raw allergens are extracted before this cleanup.
     ingredients = re.sub(r"\([^)]*\)", "", ingredients)
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
@@ -167,9 +168,30 @@ def extract_text_from_pdf(path):
     return text
 
 
+def extract_raw_text_from_request():
+    raw_text = ""
+
+    if "file" in request.files:
+        file = request.files["file"]
+        filename = secure_filename(file.filename)
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(path)
+
+        if filename.lower().endswith(".pdf"):
+            raw_text = extract_text_from_pdf(path)
+        else:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                raw_text = f.read()
+    else:
+        data = request.json or {}
+        raw_text = data.get("text", "")
+
+    return raw_text
+
+
 def is_category_line(line):
     l = line.lower()
-    return "(" in line and ")" in line and ("meat" in l or "dairy" in l)
+    return "(" in line and ")" in line and ("meat" in l or "dairy" in l or "parve" in l)
 
 
 def is_price_line(line):
@@ -254,16 +276,6 @@ def is_sushi_section_title(line):
 
 
 def parse_sushi_blocks(text):
-    """
-    Handles Apple Sushi PDFs, including:
-    - Sushi
-    - Sushi Station
-    - Fish Sushi
-    - Vegetarian Sushi
-    - Fish Combination
-    - Vegan Combination
-    - Dynamic sections such as Maki, Nigiri, Hosomaki, I/O roll, Fried Hosomaki, Sushi Rice
-    """
     text = clean_text(text)
     lines = [l.strip() for l in text.split("\n") if l.strip()]
 
@@ -287,80 +299,74 @@ def parse_sushi_blocks(text):
 
     for block in blocks:
         station = block[0].strip()
-        name = block[1].strip() if len(block) > 1 else ""
 
-        price_index = None
-        price = "55"
+        i = 1
+        while i < len(block):
+            name = block[i].strip() if i < len(block) else ""
+            next_line = block[i + 1].strip() if i + 1 < len(block) else ""
 
-        for idx, line in enumerate(block):
-            if is_price_line(line):
-                price_index = idx
-                price = clean_price(line)
-                break
-
-        if price_index is None:
-            continue
-
-        content = block[price_index + 1:]
-
-        description_lines = []
-        sections = []
-        i = 0
-
-        while i < len(content):
-            line = content[i].strip()
-
-            # A section title is usually followed by Ingredients.
-            next_line = content[i + 1].strip() if i + 1 < len(content) else ""
-
-            if is_sushi_section_title(line) and next_line.lower().startswith("ingredients"):
-                section_title = line
-                ingredients_line = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
-
-                i += 2
-                ingredient_parts = [ingredients_line] if ingredients_line else []
-
-                while i < len(content):
-                    current_line = content[i].strip()
-                    following_line = content[i + 1].strip() if i + 1 < len(content) else ""
-
-                    if is_sushi_section_title(current_line) and following_line.lower().startswith("ingredients"):
-                        break
-
-                    ingredient_parts.append(current_line)
-                    i += 1
-
-                section_ingredients = clean_text(" ".join(ingredient_parts)).strip()
-                sections.append({
-                    "title": section_title,
-                    "ingredients": section_ingredients
-                })
+            if not name or not is_price_line(next_line):
+                i += 1
                 continue
 
-            if not sections:
-                description_lines.append(line)
+            price = clean_price(next_line)
+            i += 2
 
-            i += 1
+            description_lines = []
+            sections = []
 
-        description = clean_text(" ".join(description_lines))
+            while i < len(block):
+                line = block[i].strip()
+                following = block[i + 1].strip() if i + 1 < len(block) else ""
 
-        ingredients_lines = []
-        for section in sections:
-            title = section.get("title", "").strip()
-            ingredients = section.get("ingredients", "").strip()
-            if title and ingredients:
-                ingredients_lines.append(f"{title}: {ingredients}")
-            elif ingredients:
-                ingredients_lines.append(ingredients)
+                if is_price_line(following):
+                    break
 
-        ingredients = "\n".join(ingredients_lines).strip()
+                if is_sushi_section_title(line) and following.lower().startswith("ingredients"):
+                    section_title = line
+                    ingredients_line = following.split(":", 1)[-1].strip() if ":" in following else ""
 
-        if name:
+                    i += 2
+                    ingredient_parts = [ingredients_line] if ingredients_line else []
+
+                    while i < len(block):
+                        current_line = block[i].strip()
+                        next_current = block[i + 1].strip() if i + 1 < len(block) else ""
+
+                        if is_sushi_section_title(current_line) and next_current.lower().startswith("ingredients"):
+                            break
+
+                        if is_price_line(next_current):
+                            break
+
+                        ingredient_parts.append(current_line)
+                        i += 1
+
+                    sections.append({
+                        "title": section_title,
+                        "ingredients": clean_text(" ".join(ingredient_parts))
+                    })
+                    continue
+
+                if not sections:
+                    description_lines.append(line)
+
+                i += 1
+
+            ingredients_lines = []
+            for section in sections:
+                title = section.get("title", "").strip()
+                ingredients = section.get("ingredients", "").strip()
+                if title and ingredients:
+                    ingredients_lines.append(f"{title}: {ingredients}")
+                elif ingredients:
+                    ingredients_lines.append(ingredients)
+
             dishes.append({
                 "category_raw": station,
                 "name": name,
-                "description": description,
-                "ingredients": ingredients,
+                "description": clean_text(" ".join(description_lines)),
+                "ingredients": "\n".join(ingredients_lines).strip(),
                 "price": price
             })
 
@@ -370,9 +376,6 @@ def parse_sushi_blocks(text):
 def parse_text(text):
     text = clean_text(text)
 
-    # Special Apple sushi parser.
-    # This does not change the display design.
-    # It only converts sushi PDF structure into the same dish object used by the current template.
     if is_sushi_pdf(text):
         sushi_dishes = parse_sushi_blocks(text)
         if sushi_dishes:
@@ -577,6 +580,19 @@ def normalize_dish(raw):
     return dish
 
 
+def add_batch_metadata(dishes):
+    enriched = []
+
+    for index, dish in enumerate(dishes):
+        item = dict(dish)
+        item["display_id"] = index
+        item["display_number"] = index + 1
+        item["display_title"] = f'{item.get("category", "")} - {item.get("name_en", "")}'
+        enriched.append(item)
+
+    return enriched
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -584,25 +600,25 @@ def home():
 
 @app.route("/extract", methods=["POST"])
 def extract():
-    raw_text = ""
-
-    if "file" in request.files:
-        file = request.files["file"]
-        filename = secure_filename(file.filename)
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(path)
-
-        if filename.lower().endswith(".pdf"):
-            raw_text = extract_text_from_pdf(path)
-        else:
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                raw_text = f.read()
-    else:
-        data = request.json or {}
-        raw_text = data.get("text", "")
+    raw_text = extract_raw_text_from_request()
 
     raw_dishes = parse_text(raw_text)
     dishes = [normalize_dish(d) for d in raw_dishes]
+
+    return jsonify({
+        "success": True,
+        "count": len(dishes),
+        "dishes": dishes
+    })
+
+
+@app.route("/extract-full-day", methods=["POST"])
+def extract_full_day():
+    raw_text = extract_raw_text_from_request()
+
+    raw_dishes = parse_text(raw_text)
+    dishes = [normalize_dish(d) for d in raw_dishes]
+    dishes = add_batch_metadata(dishes)
 
     return jsonify({
         "success": True,
