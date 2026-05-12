@@ -72,6 +72,9 @@ def clean_text(text):
 def clean_ingredients_for_display(ingredients):
     if not ingredients:
         return ""
+
+    # Remove allergen brackets from ingredients display only.
+    # Raw allergens are extracted before this cleanup.
     ingredients = re.sub(r"\([^)]*\)", "", ingredients)
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
@@ -213,8 +216,168 @@ def is_bad_generic_description(description, name, category):
     return False
 
 
+def is_sushi_station_line(line):
+    l = (line or "").strip().lower()
+    return l in ["sushi", "sushi station"]
+
+
+def is_sushi_pdf(text):
+    lines = [l.strip() for l in clean_text(text).split("\n") if l.strip()]
+    return any(is_sushi_station_line(line) for line in lines)
+
+
+def is_sushi_section_title(line):
+    if not line:
+        return False
+
+    l = line.strip().lower()
+
+    blocked = [
+        "ingredients:",
+        "a freshly",
+        "served with",
+    ]
+
+    if any(l.startswith(x) for x in blocked):
+        return False
+
+    if is_price_line(line):
+        return False
+
+    if len(line) > 45:
+        return False
+
+    if "." in line or "," in line:
+        return False
+
+    return True
+
+
+def parse_sushi_blocks(text):
+    """
+    Handles Apple Sushi PDFs, including:
+    - Sushi
+    - Sushi Station
+    - Fish Sushi
+    - Vegetarian Sushi
+    - Fish Combination
+    - Vegan Combination
+    - Dynamic sections such as Maki, Nigiri, Hosomaki, I/O roll, Fried Hosomaki, Sushi Rice
+    """
+    text = clean_text(text)
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+    sushi_start_indexes = [
+        i for i, line in enumerate(lines)
+        if is_sushi_station_line(line)
+    ]
+
+    if not sushi_start_indexes:
+        return []
+
+    blocks = []
+
+    for pos, start in enumerate(sushi_start_indexes):
+        end = sushi_start_indexes[pos + 1] if pos + 1 < len(sushi_start_indexes) else len(lines)
+        block = lines[start:end]
+        if len(block) >= 3:
+            blocks.append(block)
+
+    dishes = []
+
+    for block in blocks:
+        station = block[0].strip()
+        name = block[1].strip() if len(block) > 1 else ""
+
+        price_index = None
+        price = "55"
+
+        for idx, line in enumerate(block):
+            if is_price_line(line):
+                price_index = idx
+                price = clean_price(line)
+                break
+
+        if price_index is None:
+            continue
+
+        content = block[price_index + 1:]
+
+        description_lines = []
+        sections = []
+        i = 0
+
+        while i < len(content):
+            line = content[i].strip()
+
+            # A section title is usually followed by Ingredients.
+            next_line = content[i + 1].strip() if i + 1 < len(content) else ""
+
+            if is_sushi_section_title(line) and next_line.lower().startswith("ingredients"):
+                section_title = line
+                ingredients_line = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
+
+                i += 2
+                ingredient_parts = [ingredients_line] if ingredients_line else []
+
+                while i < len(content):
+                    current_line = content[i].strip()
+                    following_line = content[i + 1].strip() if i + 1 < len(content) else ""
+
+                    if is_sushi_section_title(current_line) and following_line.lower().startswith("ingredients"):
+                        break
+
+                    ingredient_parts.append(current_line)
+                    i += 1
+
+                section_ingredients = clean_text(" ".join(ingredient_parts)).strip()
+                sections.append({
+                    "title": section_title,
+                    "ingredients": section_ingredients
+                })
+                continue
+
+            if not sections:
+                description_lines.append(line)
+
+            i += 1
+
+        description = clean_text(" ".join(description_lines))
+
+        ingredients_lines = []
+        for section in sections:
+            title = section.get("title", "").strip()
+            ingredients = section.get("ingredients", "").strip()
+            if title and ingredients:
+                ingredients_lines.append(f"{title}: {ingredients}")
+            elif ingredients:
+                ingredients_lines.append(ingredients)
+
+        ingredients = "\n".join(ingredients_lines).strip()
+
+        if name:
+            dishes.append({
+                "category_raw": station,
+                "name": name,
+                "description": description,
+                "ingredients": ingredients,
+                "price": price
+            })
+
+    return dishes
+
+
 def parse_text(text):
     text = clean_text(text)
+
+    # Special Apple sushi parser.
+    # This does not change the display design.
+    # It only converts sushi PDF structure into the same dish object used by the current template.
+    if is_sushi_pdf(text):
+        sushi_dishes = parse_sushi_blocks(text)
+        if sushi_dishes:
+            return sushi_dishes
+
     lines = [l.strip() for l in text.split("\n") if l.strip()]
 
     dishes = []
@@ -339,6 +502,19 @@ Rules:
   shatta = שאטה
 - Keep culinary terms when appropriate: טחינה, אריסה, מטבוחה, פתיתים, קובה, סינייה, בריסקט.
 - If a vegan dish is kosher dairy because of the station, do not mention parve.
+- For sushi, keep section names clear. Examples:
+  Hosomaki = הוסומאקי
+  Maki = מאקי
+  Nigiri = ניגירי
+  Sashimi = סשימי
+  Futomaki = פוטומאקי
+  I/O roll = רול אינסייד-אאוט
+  Fried Hosomaki = הוסומאקי מטוגן
+  Sushi Rice = אורז סושי
+- For Fish Sushi translate as סושי דגים.
+- For Vegetarian Sushi translate as סושי צמחוני.
+- For Fish Combination translate as קומבינציית סושי דגים.
+- For Vegan Combination translate as קומבינציית סושי טבעונית.
 
 Return exactly:
 {
