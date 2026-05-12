@@ -283,6 +283,7 @@ button.secondary{
   padding:16px 18px;
   font-size:17px;
   line-height:1.6;
+  white-space:pre-line;
 }
 
 .ingredients.he{
@@ -391,6 +392,7 @@ button.secondary{
 <option>Bakery</option>
 <option>Veg/Vegan</option>
 <option>Sushi</option>
+<option>Sushi Station</option>
 <option>Salad Bar</option>
 </select>
 </div>
@@ -511,6 +513,7 @@ const categoryMap = {
   "Bakery": {he:"מאפייה", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
   "Veg/Vegan": {he:"צמחוני / טבעוני", kosherEn:"Dairy", kosherHe:"חלבי", color:"#0071e3", bg:"#e8f1ff", text:"#0057b8"},
   "Sushi": {he:"סושי", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
+  "Sushi Station": {he:"סושי", kosherEn:"Meat", kosherHe:"בשרי", color:"#d70015", bg:"#ffe5e5", text:"#b00020"},
   "Salad Bar": {he:"סלט בר", kosherEn:"Parve", kosherHe:"פרווה", color:"#34c759", bg:"#e8fff0", text:"#15803d"}
 };
 
@@ -521,18 +524,44 @@ const allergenMap = [
   ["eggs","Eggs","ביצים"],
   ["milk","Milk","חלב"],
   ["soy","Soy","סויה"],
+  ["soya","Soy","סויה"],
   ["sesame","Sesame","שומשום"],
   ["mustard","Mustard","חרדל"],
   ["lupin","Lupin","לופין"],
   ["fish","Fish","דגים"],
   ["celery","Celery","סלרי"],
   ["sulfites","Sulfites","סולפיטים"],
-  ["sulphites","Sulfites","סולפיטים"]
+  ["sulphites","Sulfites","סולפיטים"],
+  ["peanut","Peanuts","בוטנים"],
+  ["peanuts","Peanuts","בוטנים"],
+  ["nut","Nuts","אגוזים"],
+  ["nuts","Nuts","אגוזים"]
 ];
+
+function normalizeIncomingCategory(category){
+  const raw = (category || "").trim();
+  const lower = raw.toLowerCase();
+
+  if(categoryMap[raw]) return raw;
+
+  if(lower.includes("sushi")) return "Sushi Station";
+
+  if(lower.includes("grill")) return "Grill";
+  if(lower.includes("chef")) return "Chef Special";
+  if(lower.includes("sandwich")) return "Sandwich";
+  if(lower.includes("soup")) return "Soup";
+  if(lower.includes("fish")) return "Fish Special";
+  if(lower.includes("pizza")) return "Pizza";
+  if(lower.includes("bakery")) return "Bakery";
+  if(lower.includes("veg") || lower.includes("vegan") || lower.includes("vegetarian")) return "Veg/Vegan";
+  if(lower.includes("salad")) return "Salad Bar";
+
+  return "Grill";
+}
 
 function applyCategory(){
   const cat=document.getElementById("category").value;
-  const data=categoryMap[cat];
+  const data=categoryMap[cat] || categoryMap["Grill"];
 
   document.getElementById("kosher").value=`${data.kosherEn} | ${data.kosherHe}`;
 
@@ -553,7 +582,8 @@ function updateAllergens(){
   const foundHe=[];
 
   allergenMap.forEach(a=>{
-    if(text.includes(a[0])){
+    const regex = new RegExp("\\b" + a[0] + "\\b", "i");
+    if(regex.test(text)){
       if(!foundEn.includes(a[1])) foundEn.push(a[1]);
       if(!foundHe.includes(a[2])) foundHe.push(a[2]);
     }
@@ -567,7 +597,7 @@ function updatePreview(){
   applyCategory();
 
   const cat=document.getElementById("category").value;
-  const data=categoryMap[cat];
+  const data=categoryMap[cat] || categoryMap["Grill"];
 
   document.getElementById("catEnView").innerText=cat;
   document.getElementById("catHeView").innerText=data.he;
@@ -589,7 +619,9 @@ function updatePreview(){
 }
 
 function fillForm(d){
-  document.getElementById("category").value=d.category || "Grill";
+  const fixedCategory = normalizeIncomingCategory(d.category);
+  document.getElementById("category").value = fixedCategory;
+
   document.getElementById("price").value=d.price || "";
 
   document.getElementById("nameEn").value=d.name_en || "";
