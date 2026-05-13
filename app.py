@@ -29,6 +29,7 @@ MEAT_STATIONS = [
     "sandwich",
     "soup",
     "sushi",
+    "sushi station",
     "meat station",
     "chicken station"
 ]
@@ -47,7 +48,6 @@ DAIRY_STATIONS = [
 SIDE_DISH_NAMES = {
     "rice",
     "french fries",
-    "french fries.",
     "fries",
     "puree",
     "polenta",
@@ -291,6 +291,15 @@ Rules:
 - Translate ingredients only from the ingredients field.
 - Translate description only from the description field.
 - Do not move description into ingredients.
+- For sushi:
+  Fish Sushi = סושי דגים
+  Vegetarian Sushi = סושי צמחוני
+  Fish Combination = קומבינציית סושי דגים
+  Vegan Combination = קומבינציית סושי טבעונית
+  I/O = רול אינסייד-אאוט
+  Maki = מאקי
+  Sashimi = סשימי
+  Nigiri = ניגירי
 
 Return:
 {
@@ -384,6 +393,141 @@ def find_dish_starts(lines):
     return cleaned
 
 
+def is_sushi_station(station):
+    return "sushi" in (station or "").lower()
+
+
+def is_sushi_dish_name(line):
+    l = (line or "").strip().lower()
+
+    return l in {
+        "fish sushi",
+        "vegetarian sushi",
+        "fish combination",
+        "vegan combination"
+    }
+
+
+def is_sushi_section_name(line):
+    l = (line or "").strip().lower()
+
+    return l in {
+        "i/o",
+        "io",
+        "maki",
+        "sashimi",
+        "nigiri",
+        "futomaki",
+        "hosomaki",
+        "fried hosomaki",
+        "sushi rice"
+    }
+
+
+def find_sushi_starts(lines):
+    starts = []
+
+    for i, line in enumerate(lines):
+        if not is_sushi_dish_name(line):
+            continue
+
+        price_index = find_price_index(lines, i + 1, 3)
+
+        if price_index is not None:
+            starts.append((i, price_index))
+
+    return starts
+
+
+def parse_sushi_segment(station, name, price, segment_lines):
+    description_lines = []
+    ingredient_lines = []
+
+    i = 0
+
+    while i < len(segment_lines):
+        line = clean_text(segment_lines[i])
+        next_line = clean_text(segment_lines[i + 1]) if i + 1 < len(segment_lines) else ""
+
+        if not line:
+            i += 1
+            continue
+
+        if is_sushi_section_name(line) and next_line.lower().startswith("ingredients"):
+            section_name = line
+            ing = next_line.split(":", 1)[-1].strip() if ":" in next_line else ""
+            parts = [ing] if ing else []
+            i += 2
+
+            while i < len(segment_lines):
+                current = clean_text(segment_lines[i])
+                following = clean_text(segment_lines[i + 1]) if i + 1 < len(segment_lines) else ""
+
+                if is_sushi_section_name(current) and following.lower().startswith("ingredients"):
+                    break
+
+                if is_sushi_dish_name(current):
+                    break
+
+                parts.append(current)
+                i += 1
+
+            ingredient_lines.append(f"{section_name}: {clean_text(' '.join(parts))}")
+            continue
+
+        if line.lower().startswith("ingredients"):
+            ing = line.split(":", 1)[-1].strip() if ":" in line else ""
+            ingredient_lines.append(ing)
+            i += 1
+            continue
+
+        if not ingredient_lines:
+            description_lines.append(line)
+
+        i += 1
+
+    category = normalize_category(station)
+    raw_ingredients = clean_text("\n".join(ingredient_lines))
+
+    dish = {
+        "category": category,
+        "kosher": map_kosher(category),
+        "name_en": clean_text(name),
+        "description_en": clean_text(" ".join(description_lines)),
+        "ingredients_en": clean_ingredients_for_display(raw_ingredients),
+        "price": clean_price(price)
+    }
+
+    allergens = extract_allergens(raw_ingredients)
+    dish.update(allergens)
+
+    dish["name_he"] = dish["name_en"]
+    dish["description_he"] = dish["description_en"]
+    dish["ingredients_he"] = dish["ingredients_en"]
+
+    return dish
+
+
+def parse_sushi_page(station, body_lines):
+    starts = find_sushi_starts(body_lines)
+
+    if not starts:
+        return []
+
+    dishes = []
+
+    for idx, (start_index, price_index) in enumerate(starts):
+        next_start = starts[idx + 1][0] if idx + 1 < len(starts) else len(body_lines)
+
+        name = clean_text(" ".join(body_lines[start_index:price_index]))
+        price = body_lines[price_index]
+        segment = body_lines[price_index + 1:next_start]
+
+        dishes.append(parse_sushi_segment(station, name, price, segment))
+
+    return dishes
+
+
 def parse_dish_segment(station, name, price, segment_lines):
     description_lines = []
     ingredient_lines = []
@@ -445,7 +589,6 @@ def append_side_to_previous(previous_dish, side_name, side_segment_lines):
         return
 
     side_ingredients = []
-
     ingredient_mode = False
 
     for line in side_segment_lines:
@@ -483,16 +626,7 @@ def append_side_to_previous(previous_dish, side_name, side_segment_lines):
         previous_dish["ingredients_he"] = previous_dish["ingredients_en"]
 
 
-def parse_page(page_text):
-    page_text = clean_text(page_text)
-    lines = [line.strip() for line in page_text.split("\n") if line.strip()]
-
-    if len(lines) < 3:
-        return []
-
-    station = lines[0]
-    body = lines[1:]
-
+def parse_regular_page(station, body):
     starts = find_dish_starts(body)
 
     if not starts:
@@ -517,6 +651,22 @@ def parse_page(page_text):
         dishes.append(dish)
 
     return dishes
+
+
+def parse_page(page_text):
+    page_text = clean_text(page_text)
+    lines = [line.strip() for line in page_text.split("\n") if line.strip()]
+
+    if len(lines) < 3:
+        return []
+
+    station = lines[0]
+    body = lines[1:]
+
+    if is_sushi_station(station):
+        return parse_sushi_page(station, body)
+
+    return parse_regular_page(station, body)
 
 
 def parse_full_day_text(text):
