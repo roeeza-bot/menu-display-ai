@@ -21,7 +21,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
 MEAT_STATIONS = [
@@ -44,6 +43,32 @@ DAIRY_STATIONS = [
     "fish station",
     "pizza station"
 ]
+
+SIDE_DISH_NAMES = {
+    "rice",
+    "french fries",
+    "french fries.",
+    "fries",
+    "puree",
+    "polenta",
+    "roasted vegetables",
+    "healthy carb side dish",
+    "coconut rice",
+    "saffron rice",
+    "oshpelo",
+    "rizo",
+    "sushi rice",
+    "small salad",
+    "bread",
+    "tofu",
+    "roasted tofu",
+    "hard boiled egg",
+    "tuna",
+    "small chicken breast",
+    "chicken breast",
+    "antipasti",
+    "freekeh & vegetables"
+}
 
 ALLERGEN_PATTERNS = {
     r"\bgluten\b": ("Gluten", "גלוטן"),
@@ -80,6 +105,12 @@ def clean_text(text):
         return ""
 
     text = text.replace("\r", "\n")
+    text = text.replace("", "")
+    text = text.replace("￾", "")
+    text = text.replace("and and", "and")
+    text = text.replace("beaf", "beef")
+    text = text.replace("tomatoes salad", "tomato salad")
+    text = text.replace("Ram#", "Ramen")
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
 
@@ -94,6 +125,20 @@ def clean_price(value):
     cleaned = cleaned.replace(".00", "")
 
     return cleaned or "55"
+
+
+def clean_ingredients_for_display(ingredients):
+    if not ingredients:
+        return ""
+
+    ingredients = re.sub(r"\([^)]*\)", "", ingredients)
+    ingredients = re.sub(r"\bIngredients:\s*", "", ingredients, flags=re.IGNORECASE)
+    ingredients = re.sub(r"\bContains:\s*", "", ingredients, flags=re.IGNORECASE)
+    ingredients = re.sub(r"\s+,", ",", ingredients)
+    ingredients = re.sub(r",\s*,", ",", ingredients)
+    ingredients = re.sub(r"\s{2,}", " ", ingredients)
+
+    return clean_text(ingredients).strip(" ,.")
 
 
 def extract_text_from_pdf(path):
@@ -111,6 +156,23 @@ def extract_text_from_pdf(path):
     doc.close()
 
     return "\n\n__PAGE_BREAK__\n\n".join(pages)
+
+
+def extract_raw_text_from_request():
+    if "file" in request.files:
+        file = request.files["file"]
+        filename = secure_filename(file.filename)
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(path)
+
+        if filename.lower().endswith(".pdf"):
+            return extract_text_from_pdf(path)
+
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
+
+    data = request.json or {}
+    return data.get("text", "")
 
 
 def extract_allergens(text):
@@ -221,11 +283,14 @@ You are a professional culinary translator for Apple Caffè Macs.
 Return JSON only.
 
 Rules:
-- Translate to professional culinary Hebrew
-- Keep sushi terminology accurate
-- Do not invent ingredients
-- Do not change dish meaning
-- Keep translations short and elegant
+- Translate to professional culinary Hebrew.
+- Keep sushi terminology accurate.
+- Do not invent ingredients.
+- Do not change dish meaning.
+- Keep translations short and elegant.
+- Translate ingredients only from the ingredients field.
+- Translate description only from the description field.
+- Do not move description into ingredients.
 
 Return:
 {
@@ -257,66 +322,231 @@ Return:
         return fallback
 
 
-def parse_pdf_pages(text):
-    pages = [p.strip() for p in text.split("__PAGE_BREAK__") if p.strip()]
+def is_price_line(line):
+    return bool(re.search(r"₪\s*\d+", line or ""))
+
+
+def looks_like_title(line):
+    if not line:
+        return False
+
+    l = line.strip().lower()
+
+    if l.startswith("ingredients"):
+        return False
+
+    if l.startswith("contains"):
+        return False
+
+    if is_price_line(line):
+        return False
+
+    if len(line) > 70:
+        return False
+
+    if "," in line:
+        return False
+
+    return True
+
+
+def find_price_index(lines, start, max_lookahead=3):
+    end = min(len(lines), start + max_lookahead + 1)
+
+    for i in range(start, end):
+        if is_price_line(lines[i]):
+            return i
+
+    return None
+
+
+def find_dish_starts(lines):
+    starts = []
+
+    for i, line in enumerate(lines):
+        if not looks_like_title(line):
+            continue
+
+        price_index = find_price_index(lines, i + 1, 3)
+
+        if price_index is not None:
+            starts.append((i, price_index))
+
+    cleaned = []
+    used_prices = set()
+
+    for start, price in starts:
+        if price in used_prices:
+            continue
+        cleaned.append((start, price))
+        used_prices.add(price)
+
+    return cleaned
+
+
+def parse_dish_segment(station, name, price, segment_lines):
+    description_lines = []
+    ingredient_lines = []
+
+    repeated_name_seen = False
+    ingredient_mode = False
+
+    for line in segment_lines:
+        clean_line = clean_text(line)
+
+        if not clean_line:
+            continue
+
+        if clean_line == name:
+            repeated_name_seen = True
+            continue
+
+        if clean_line.lower().startswith("ingredients"):
+            ing = clean_line.split(":", 1)[-1].strip() if ":" in clean_line else ""
+            ingredient_lines.append(ing)
+            ingredient_mode = True
+            continue
+
+        if ingredient_mode:
+            ingredient_lines.append(clean_line)
+            continue
+
+        if repeated_name_seen:
+            continue
+
+        description_lines.append(clean_line)
+
+    description = clean_text(" ".join(description_lines))
+    raw_ingredients = clean_text(" ".join(ingredient_lines))
+
+    category = normalize_category(station)
+
+    dish = {
+        "category": category,
+        "kosher": map_kosher(category),
+        "name_en": clean_text(name),
+        "description_en": description,
+        "ingredients_en": clean_ingredients_for_display(raw_ingredients),
+        "price": clean_price(price)
+    }
+
+    allergens = extract_allergens(raw_ingredients)
+    dish.update(allergens)
+
+    dish["name_he"] = dish["name_en"]
+    dish["description_he"] = dish["description_en"]
+    dish["ingredients_he"] = dish["ingredients_en"]
+
+    return dish
+
+
+def append_side_to_previous(previous_dish, side_name, side_segment_lines):
+    if not previous_dish:
+        return
+
+    side_ingredients = []
+
+    ingredient_mode = False
+
+    for line in side_segment_lines:
+        clean_line = clean_text(line)
+
+        if not clean_line:
+            continue
+
+        if clean_line == side_name:
+            continue
+
+        if is_price_line(clean_line):
+            continue
+
+        if clean_line.lower().startswith("ingredients"):
+            ing = clean_line.split(":", 1)[-1].strip() if ":" in clean_line else ""
+            side_ingredients.append(ing)
+            ingredient_mode = True
+            continue
+
+        if ingredient_mode:
+            side_ingredients.append(clean_line)
+
+    side_text = clean_ingredients_for_display(clean_text(" ".join(side_ingredients)))
+
+    if side_text:
+        if previous_dish.get("ingredients_en"):
+            previous_dish["ingredients_en"] += f", {side_text}"
+        else:
+            previous_dish["ingredients_en"] = side_text
+
+        allergens = extract_allergens(previous_dish["ingredients_en"])
+        previous_dish.update(allergens)
+
+        previous_dish["ingredients_he"] = previous_dish["ingredients_en"]
+
+
+def parse_page(page_text):
+    page_text = clean_text(page_text)
+    lines = [line.strip() for line in page_text.split("\n") if line.strip()]
+
+    if len(lines) < 3:
+        return []
+
+    station = lines[0]
+    body = lines[1:]
+
+    starts = find_dish_starts(body)
+
+    if not starts:
+        return []
+
+    dishes = []
+
+    for idx, (start_index, price_index) in enumerate(starts):
+        next_start = starts[idx + 1][0] if idx + 1 < len(starts) else len(body)
+
+        name = clean_text(" ".join(body[start_index:price_index]))
+        price = body[price_index]
+        segment = body[price_index + 1:next_start]
+
+        normalized_name = name.lower().strip()
+
+        if normalized_name in SIDE_DISH_NAMES and dishes:
+            append_side_to_previous(dishes[-1], name, segment)
+            continue
+
+        dish = parse_dish_segment(station, name, price, segment)
+        dishes.append(dish)
+
+    return dishes
+
+
+def parse_full_day_text(text):
+    if "__PAGE_BREAK__" in text:
+        pages = [p.strip() for p in text.split("__PAGE_BREAK__") if p.strip()]
+    else:
+        pages = [text]
 
     dishes = []
 
     for page in pages:
-
-        lines = [l.strip() for l in page.split("\n") if l.strip()]
-
-        if len(lines) < 3:
-            continue
-
-        station = lines[0]
-        category = normalize_category(station)
-
-        current_name = None
-        current_price = "55"
-        current_description = []
-        current_ingredients = []
-
-        for line in lines[1:]:
-
-            if re.search(r"₪\s*\d+", line):
-                current_price = clean_price(line)
-                continue
-
-            if line.lower().startswith("ingredients"):
-                ing = line.split(":", 1)[-1].strip() if ":" in line else ""
-                current_ingredients.append(ing)
-                continue
-
-            if len(line) < 60 and not current_name:
-                current_name = line
-                continue
-
-            if current_name and not current_description:
-                current_description.append(line)
-                continue
-
-            current_ingredients.append(line)
-
-        if current_name:
-            ingredients_text = clean_text(" ".join(current_ingredients))
-
-            dish = {
-                "category": category,
-                "kosher": map_kosher(category),
-                "name_en": clean_text(current_name),
-                "description_en": clean_text(" ".join(current_description)),
-                "ingredients_en": ingredients_text,
-                "price": current_price
-            }
-
-            allergens = extract_allergens(ingredients_text)
-
-            dish.update(allergens)
-
-            dishes.append(dish)
+        dishes.extend(parse_page(page))
 
     return dishes
+
+
+def add_ai_to_dishes(dishes):
+    enriched = []
+
+    for dish in dishes:
+        item = dict(dish)
+        ai = ai_translate(item)
+
+        item["name_he"] = ai["name_he"]
+        item["description_he"] = ai["description_he"]
+        item["ingredients_he"] = ai["ingredients_he"]
+
+        enriched.append(item)
+
+    return enriched
 
 
 @app.route("/")
@@ -326,27 +556,21 @@ def home():
 
 @app.route("/extract-full-day", methods=["POST"])
 def extract_full_day():
+    raw_text = extract_raw_text_from_request()
+    dishes = parse_full_day_text(raw_text)
 
-    if "file" not in request.files:
-        return jsonify({
-            "success": False,
-            "error": "No file uploaded"
-        }), 400
+    return jsonify({
+        "success": True,
+        "count": len(dishes),
+        "dishes": dishes
+    })
 
-    file = request.files["file"]
 
-    filename = secure_filename(file.filename)
-
-    path = os.path.join(UPLOAD_FOLDER, filename)
-
-    file.save(path)
-
-    if filename.lower().endswith(".pdf"):
-        raw_text = extract_text_from_pdf(path)
-    else:
-        raw_text = file.read().decode("utf-8", errors="ignore")
-
-    dishes = parse_pdf_pages(raw_text)
+@app.route("/extract", methods=["POST"])
+def extract():
+    raw_text = extract_raw_text_from_request()
+    dishes = parse_full_day_text(raw_text)
+    dishes = add_ai_to_dishes(dishes)
 
     return jsonify({
         "success": True,
@@ -357,14 +581,37 @@ def extract_full_day():
 
 @app.route("/enhance", methods=["POST"])
 def enhance():
-
     data = request.json or {}
-
     translated = ai_translate(data)
 
     return jsonify({
         "success": True,
         "dish": translated
+    })
+
+
+@app.route("/create-display", methods=["POST"])
+def create_display():
+    data = request.json or {}
+
+    display = {
+        "kosher": data.get("kosher", ""),
+        "category": data.get("category", ""),
+        "name_he": data.get("name_he", ""),
+        "name_en": data.get("name_en", ""),
+        "description_he": data.get("description_he", ""),
+        "description_en": data.get("description_en", ""),
+        "ingredients_he": data.get("ingredients_he", ""),
+        "ingredients_en": clean_ingredients_for_display(data.get("ingredients_en", "")),
+        "allergens": data.get("allergens", ""),
+        "allergens_en": data.get("allergens_en", ""),
+        "allergens_he": data.get("allergens_he", ""),
+        "price": data.get("price", "55")
+    }
+
+    return jsonify({
+        "success": True,
+        "display": display
     })
 
 
