@@ -24,49 +24,21 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
 MEAT_STATIONS = [
-    "grill",
-    "chef special",
-    "sandwich",
-    "soup",
-    "sushi",
-    "sushi station",
-    "meat station",
-    "chicken station"
+    "grill", "chef special", "sandwich", "soup",
+    "sushi", "sushi station", "meat station", "chicken station"
 ]
 
 DAIRY_STATIONS = [
-    "fish special",
-    "pizza",
-    "bakery",
-    "veg",
-    "vegan",
-    "vegetarian",
-    "fish station",
-    "pizza station"
+    "fish special", "pizza", "bakery", "veg", "vegan",
+    "vegetarian", "fish station", "pizza station"
 ]
 
 SIDE_DISH_NAMES = {
-    "rice",
-    "french fries",
-    "fries",
-    "puree",
-    "polenta",
-    "roasted vegetables",
-    "healthy carb side dish",
-    "coconut rice",
-    "saffron rice",
-    "oshpelo",
-    "rizo",
-    "sushi rice",
-    "small salad",
-    "bread",
-    "tofu",
-    "roasted tofu",
-    "hard boiled egg",
-    "tuna",
-    "small chicken breast",
-    "chicken breast",
-    "antipasti",
+    "rice", "french fries", "fries", "puree", "polenta",
+    "roasted vegetables", "healthy carb side dish", "coconut rice",
+    "saffron rice", "oshpelo", "rizo", "sushi rice", "small salad",
+    "bread", "tofu", "roasted tofu", "hard boiled egg", "tuna",
+    "small chicken breast", "chicken breast", "antipasti",
     "freekeh & vegetables"
 }
 
@@ -100,13 +72,14 @@ CULINARY_HE_REPLACEMENTS = {
     "shatta": "שאטה",
     "mushroom": "פטריות",
     "mushrooms": "פטריות",
+    "radish": "צנון",
+    "radishes": "צנון",
 }
 
 
 def clean_text(text):
     if not text:
         return ""
-
     text = text.replace("\r", "\n")
     text = text.replace("", "")
     text = text.replace("￾", "")
@@ -116,24 +89,20 @@ def clean_text(text):
     text = text.replace("Ram#", "Ramen")
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
-
     return text.strip()
 
 
 def clean_price(value):
     if not value:
         return "55"
-
     cleaned = re.sub(r"[^\d.]", "", value)
     cleaned = cleaned.replace(".00", "")
-
     return cleaned or "55"
 
 
 def clean_ingredients_for_display(ingredients):
     if not ingredients:
         return ""
-
     ingredients = re.sub(r"\([^)]*\)", "", ingredients)
     ingredients = re.sub(r"\bIngredients:\s*", "", ingredients, flags=re.IGNORECASE)
     ingredients = re.sub(r"\bContains:\s*", "", ingredients, flags=re.IGNORECASE)
@@ -141,24 +110,18 @@ def clean_ingredients_for_display(ingredients):
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
     ingredients = re.sub(r"\s{2,}", " ", ingredients)
-    ingredients = ingredients.replace(" .", ".")
-    ingredients = ingredients.replace("..", ".")
-
+    ingredients = ingredients.replace(" .", ".").replace("..", ".")
     return clean_text(ingredients).strip(" ,.")
 
 
 def clean_sushi_ingredients(text):
     if not text:
         return ""
-
     text = clean_text(text)
-
     text = re.sub(r"\s+\.", ".", text)
     text = re.sub(r"\s+\,", ",", text)
     text = re.sub(r"\.\s*$", "", text)
-    text = text.replace(" .", ".")
-    text = text.replace("..", ".")
-
+    text = text.replace(" .", ".").replace("..", ".")
     return text.strip()
 
 
@@ -175,7 +138,6 @@ def extract_text_from_pdf(path):
             pages.append(txt)
 
     doc.close()
-
     return "\n\n__PAGE_BREAK__\n\n".join(pages)
 
 
@@ -198,7 +160,6 @@ def extract_raw_text_from_request():
 
 def extract_allergens(text):
     text_l = (text or "").lower()
-
     found_en = []
     found_he = []
 
@@ -221,31 +182,22 @@ def normalize_category(category):
 
     if "sushi" in c:
         return "Sushi Station"
-
     if "grill" in c or "meat station" in c:
         return "Grill"
-
     if "chef" in c or "chicken station" in c:
         return "Chef Special"
-
     if "sandwich" in c:
         return "Sandwich"
-
     if "soup" in c:
         return "Soup"
-
     if "fish" in c:
         return "Fish Special"
-
     if "pizza" in c:
         return "Pizza"
-
     if "bakery" in c:
         return "Bakery"
-
     if "veg" in c or "vegan" in c or "vegetarian" in c:
         return "Veg/Vegan"
-
     if "salad" in c:
         return "Salad Bar"
 
@@ -278,8 +230,8 @@ def post_process_hebrew(text):
     for eng, heb in CULINARY_HE_REPLACEMENTS.items():
         result = re.sub(rf"\b{re.escape(eng)}\b", heb, result, flags=re.IGNORECASE)
 
-    result = result.replace(" .", ".")
-    result = result.replace("..", ".")
+    result = result.replace("רדיקי", "צנון")
+    result = result.replace(" .", ".").replace("..", ".")
 
     return result.strip()
 
@@ -317,6 +269,7 @@ Rules:
 - Translate description only from the description field.
 - Do not move description into ingredients.
 - Translate mushroom and mushrooms as פטריות.
+- Translate radish and radishes as צנון, never רדיקי.
 - For sushi:
   Fish Sushi = סושי דגים
   Vegetarian Sushi = סושי צמחוני
@@ -370,16 +323,12 @@ def looks_like_title(line):
 
     if l.startswith("ingredients"):
         return False
-
     if l.startswith("contains"):
         return False
-
     if is_price_line(line):
         return False
-
     if len(line) > 70:
         return False
-
     if "," in line:
         return False
 
@@ -424,9 +373,12 @@ def is_sushi_station(station):
     return "sushi" in (station or "").lower()
 
 
+def is_salad_bar_station(station):
+    return "salad" in (station or "").lower()
+
+
 def is_sushi_dish_name(line):
     l = (line or "").strip().lower()
-
     return l in {
         "fish sushi",
         "vegetarian sushi",
@@ -437,7 +389,6 @@ def is_sushi_dish_name(line):
 
 def is_sushi_section_name(line):
     l = (line or "").strip().lower()
-
     return l in {
         "i/o",
         "io",
@@ -469,7 +420,6 @@ def find_sushi_starts(lines):
 def parse_sushi_segment(station, name, price, segment_lines):
     description_lines = []
     ingredient_lines = []
-
     i = 0
 
     while i < len(segment_lines):
@@ -492,7 +442,6 @@ def parse_sushi_segment(station, name, price, segment_lines):
 
                 if is_sushi_section_name(current) and following.lower().startswith("ingredients"):
                     break
-
                 if is_sushi_dish_name(current):
                     break
 
@@ -546,11 +495,9 @@ def parse_sushi_page(station, body_lines):
 
     for idx, (start_index, price_index) in enumerate(starts):
         next_start = starts[idx + 1][0] if idx + 1 < len(starts) else len(body_lines)
-
         name = clean_text(" ".join(body_lines[start_index:price_index]))
         price = body_lines[price_index]
         segment = body_lines[price_index + 1:next_start]
-
         dishes.append(parse_sushi_segment(station, name, price, segment))
 
     return dishes
@@ -559,7 +506,6 @@ def parse_sushi_page(station, body_lines):
 def parse_dish_segment(station, name, price, segment_lines):
     description_lines = []
     ingredient_lines = []
-
     repeated_name_seen = False
     ingredient_mode = False
 
@@ -590,7 +536,6 @@ def parse_dish_segment(station, name, price, segment_lines):
 
     description = clean_text(" ".join(description_lines))
     raw_ingredients = clean_text(" ".join(ingredient_lines))
-
     category = normalize_category(station)
 
     dish = {
@@ -624,10 +569,8 @@ def append_side_to_previous(previous_dish, side_name, side_segment_lines):
 
         if not clean_line:
             continue
-
         if clean_line == side_name:
             continue
-
         if is_price_line(clean_line):
             continue
 
@@ -650,8 +593,20 @@ def append_side_to_previous(previous_dish, side_name, side_segment_lines):
 
         allergens = extract_allergens(previous_dish["ingredients_en"])
         previous_dish.update(allergens)
-
         previous_dish["ingredients_he"] = previous_dish["ingredients_en"]
+
+
+def should_skip_as_display_dish(name, price):
+    normalized_name = (name or "").lower().strip()
+    normalized_price = clean_price(price)
+
+    if normalized_name in SIDE_DISH_NAMES:
+        return True
+
+    if normalized_price == "7":
+        return True
+
+    return False
 
 
 def parse_regular_page(station, body):
@@ -669,13 +624,9 @@ def parse_regular_page(station, body):
         price = body[price_index]
         segment = body[price_index + 1:next_start]
 
-        normalized_name = name.lower().strip()
-
-        if normalized_name in SIDE_DISH_NAMES and dishes:
-            append_side_to_previous(dishes[-1], name, segment)
-            continue
-
-        if normalized_name in SIDE_DISH_NAMES:
+        if should_skip_as_display_dish(name, price):
+            if dishes:
+                append_side_to_previous(dishes[-1], name, segment)
             continue
 
         dish = parse_dish_segment(station, name, price, segment)
@@ -692,6 +643,10 @@ def parse_page(page_text):
         return []
 
     station = lines[0]
+
+    if is_salad_bar_station(station):
+        return []
+
     body = lines[1:]
 
     if is_sushi_station(station):
