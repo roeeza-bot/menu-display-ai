@@ -84,6 +84,7 @@ ALLERGEN_PATTERNS = {
     r"\bpeanut\b|\bpeanuts\b": ("Peanuts", "בוטנים"),
     r"\bcelery\b": ("Celery", "סלרי"),
     r"\bsulfites\b|\bsulphites\b": ("Sulfites", "סולפיטים"),
+    r"\bwine\b|\bred wine\b|\bwhite wine\b|\bmirin\b|\balcohol\b": ("Alcohol", "אלכוהול"),
 }
 
 CULINARY_HE_REPLACEMENTS = {
@@ -97,6 +98,8 @@ CULINARY_HE_REPLACEMENTS = {
     "brioche": "בריוש",
     "kimchi": "קימצ׳י",
     "shatta": "שאטה",
+    "mushroom": "פטריות",
+    "mushrooms": "פטריות",
 }
 
 
@@ -134,11 +137,29 @@ def clean_ingredients_for_display(ingredients):
     ingredients = re.sub(r"\([^)]*\)", "", ingredients)
     ingredients = re.sub(r"\bIngredients:\s*", "", ingredients, flags=re.IGNORECASE)
     ingredients = re.sub(r"\bContains:\s*", "", ingredients, flags=re.IGNORECASE)
+    ingredients = re.sub(r"\s+\.", ".", ingredients)
     ingredients = re.sub(r"\s+,", ",", ingredients)
     ingredients = re.sub(r",\s*,", ",", ingredients)
     ingredients = re.sub(r"\s{2,}", " ", ingredients)
+    ingredients = ingredients.replace(" .", ".")
+    ingredients = ingredients.replace("..", ".")
 
     return clean_text(ingredients).strip(" ,.")
+
+
+def clean_sushi_ingredients(text):
+    if not text:
+        return ""
+
+    text = clean_text(text)
+
+    text = re.sub(r"\s+\.", ".", text)
+    text = re.sub(r"\s+\,", ",", text)
+    text = re.sub(r"\.\s*$", "", text)
+    text = text.replace(" .", ".")
+    text = text.replace("..", ".")
+
+    return text.strip()
 
 
 def extract_text_from_pdf(path):
@@ -255,7 +276,10 @@ def post_process_hebrew(text):
     result = text
 
     for eng, heb in CULINARY_HE_REPLACEMENTS.items():
-        result = re.sub(eng, heb, result, flags=re.IGNORECASE)
+        result = re.sub(rf"\b{re.escape(eng)}\b", heb, result, flags=re.IGNORECASE)
+
+    result = result.replace(" .", ".")
+    result = result.replace("..", ".")
 
     return result.strip()
 
@@ -270,14 +294,15 @@ def ai_translate(dish):
     if client is None:
         return fallback
 
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            temperature=0.1,
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
+    for attempt in range(2):
+        try:
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                temperature=0.1,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """
 You are a professional culinary translator for Apple Caffè Macs.
 
 Return JSON only.
@@ -291,6 +316,7 @@ Rules:
 - Translate ingredients only from the ingredients field.
 - Translate description only from the description field.
 - Do not move description into ingredients.
+- Translate mushroom and mushrooms as פטריות.
 - For sushi:
   Fish Sushi = סושי דגים
   Vegetarian Sushi = סושי צמחוני
@@ -308,27 +334,28 @@ Return:
 "ingredients_he":"..."
 }
 """
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(dish, ensure_ascii=False)
-                }
-            ]
-        )
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(dish, ensure_ascii=False)
+                    }
+                ]
+            )
 
-        raw = response.choices[0].message.content
-        raw = raw.replace("```json", "").replace("```", "").strip()
+            raw = response.choices[0].message.content
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            parsed = json.loads(raw)
 
-        parsed = json.loads(raw)
+            return {
+                "name_he": post_process_hebrew(parsed.get("name_he", fallback["name_he"])),
+                "description_he": post_process_hebrew(parsed.get("description_he", fallback["description_he"])),
+                "ingredients_he": post_process_hebrew(parsed.get("ingredients_he", fallback["ingredients_he"]))
+            }
 
-        return {
-            "name_he": post_process_hebrew(parsed.get("name_he", fallback["name_he"])),
-            "description_he": post_process_hebrew(parsed.get("description_he", fallback["description_he"])),
-            "ingredients_he": post_process_hebrew(parsed.get("ingredients_he", fallback["ingredients_he"]))
-        }
+        except Exception:
+            continue
 
-    except Exception:
-        return fallback
+    return fallback
 
 
 def is_price_line(line):
@@ -472,12 +499,13 @@ def parse_sushi_segment(station, name, price, segment_lines):
                 parts.append(current)
                 i += 1
 
-            ingredient_lines.append(f"{section_name}: {clean_text(' '.join(parts))}")
+            section_text = clean_sushi_ingredients(clean_text(" ".join(parts)))
+            ingredient_lines.append(f"{section_name}: {section_text}")
             continue
 
         if line.lower().startswith("ingredients"):
             ing = line.split(":", 1)[-1].strip() if ":" in line else ""
-            ingredient_lines.append(ing)
+            ingredient_lines.append(clean_sushi_ingredients(ing))
             i += 1
             continue
 
@@ -487,7 +515,7 @@ def parse_sushi_segment(station, name, price, segment_lines):
         i += 1
 
     category = normalize_category(station)
-    raw_ingredients = clean_text("\n".join(ingredient_lines))
+    raw_ingredients = clean_sushi_ingredients("\n".join(ingredient_lines))
 
     dish = {
         "category": category,
@@ -645,6 +673,9 @@ def parse_regular_page(station, body):
 
         if normalized_name in SIDE_DISH_NAMES and dishes:
             append_side_to_previous(dishes[-1], name, segment)
+            continue
+
+        if normalized_name in SIDE_DISH_NAMES:
             continue
 
         dish = parse_dish_segment(station, name, price, segment)
