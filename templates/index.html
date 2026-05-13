@@ -610,7 +610,6 @@ function normalizeIncomingCategory(category){
   const lower = raw.toLowerCase();
 
   if(categoryMap[raw]) return raw;
-
   if(lower.includes("sushi")) return "Sushi Station";
   if(lower.includes("grill") || lower.includes("meat station")) return "Grill";
   if(lower.includes("chef") || lower.includes("chicken station")) return "Chef Special";
@@ -640,10 +639,7 @@ function applyCategory(){
 
   document.getElementById("kosher").value=`${data.kosherEn} | ${data.kosherHe}`;
 
-  const accent=document.getElementById("accent");
-  accent.style.backgroundColor=data.color;
-  accent.style.background=data.color;
-
+  document.getElementById("accent").style.background=data.color;
   document.getElementById("kosherBadge").style.background=data.bg;
   document.getElementById("kosherBadge").style.color=data.text;
   document.getElementById("kosherDot").style.background=data.color;
@@ -676,17 +672,13 @@ function updatePreview(){
   document.getElementById("catHeView").innerText=data.he;
   document.getElementById("kosherView").innerText=`${data.kosherEn} | ${data.kosherHe}`;
 
-  const price=document.getElementById("price").value || "55";
-  document.getElementById("priceView").innerText=`₪${price}`;
-
+  document.getElementById("priceView").innerText=`₪${document.getElementById("price").value || "55"}`;
   document.getElementById("nameEnView").innerText=document.getElementById("nameEn").value || "";
   document.getElementById("descEnView").innerText=document.getElementById("descEn").value || "";
   document.getElementById("ingEnView").innerText=document.getElementById("ingEn").value || "";
-
   document.getElementById("nameHeView").innerText=document.getElementById("nameHe").value || "";
   document.getElementById("descHeView").innerText=document.getElementById("descHe").value || "";
   document.getElementById("ingHeView").innerText=document.getElementById("ingHe").value || "";
-
   document.getElementById("allEnView").innerText=document.getElementById("allEn").value || "";
   document.getElementById("allHeView").innerText=document.getElementById("allHe").value || "";
 }
@@ -724,9 +716,7 @@ function saveCurrentDishEdit(){
 function fillForm(d, batchIndex = -1){
   isLoadingDish = true;
 
-  const fixedCategory = normalizeIncomingCategory(d.category);
-  document.getElementById("category").value = fixedCategory;
-
+  document.getElementById("category").value = normalizeIncomingCategory(d.category);
   document.getElementById("price").value=d.price || "";
   document.getElementById("nameEn").value=d.name_en || "";
   document.getElementById("descEn").value=d.description_en || "";
@@ -743,7 +733,6 @@ function fillForm(d, batchIndex = -1){
 
   updatePreview();
   updateBatchPosition();
-
   isLoadingDish = false;
 }
 
@@ -756,7 +745,7 @@ async function generateFullDay(){
     return;
   }
 
-  status.innerText = "Generating full day displays...";
+  status.innerText = "Step 1/2: Extracting dishes from PDF...";
 
   const formData = new FormData();
   formData.append("file", fileInput.files[0]);
@@ -768,29 +757,18 @@ async function generateFullDay(){
     });
 
     const rawText = await res.text();
-
-    console.log("FULL DAY RAW RESPONSE:");
-    console.log(rawText);
-
     let data;
 
     try{
       data = JSON.parse(rawText);
-    }catch(parseError){
-      console.error("JSON PARSE ERROR:", parseError);
+    }catch(err){
+      console.error("Invalid server response:", rawText);
       status.innerText = "Server returned invalid response. Open Console.";
       return;
     }
 
-    if(!res.ok){
-      status.innerText = data.error || `Server error ${res.status}`;
-      console.error("SERVER ERROR:", data);
-      return;
-    }
-
     if(!data.success){
-      status.innerText = data.error || "Generation failed";
-      console.error("FULL DAY FAILED:", data);
+      status.innerText = data.error || "Extraction failed.";
       return;
     }
 
@@ -803,11 +781,65 @@ async function generateFullDay(){
       fillForm(batchDishes[0], 0);
     }
 
-    status.innerText = `Generated ${batchDishes.length} displays`;
+    status.innerText = `Step 2/2: Enhancing Hebrew 0 / ${batchDishes.length}`;
+
+    await enhanceBatchHebrew();
+
+    renderBatchList();
+
+    if(batchDishes.length){
+      fillForm(batchDishes[currentBatchIndex >= 0 ? currentBatchIndex : 0], currentBatchIndex >= 0 ? currentBatchIndex : 0);
+    }
+
+    status.innerText = `Generated ${batchDishes.length} displays with AI Hebrew`;
 
   }catch(err){
     console.error("FULL DAY ERROR:", err);
     status.innerText = "Full day generation failed. Open Console.";
+  }
+}
+
+async function enhanceBatchHebrew(){
+  const status = document.getElementById("fullDayStatus");
+
+  for(let i = 0; i < batchDishes.length; i++){
+    status.innerText = `Enhancing Hebrew ${i + 1} / ${batchDishes.length}`;
+
+    const dish = batchDishes[i];
+
+    try{
+      const res = await fetch("/enhance",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          category:dish.category || "",
+          kosher:dish.kosher || "",
+          name_en:dish.name_en || "",
+          description_en:dish.description_en || "",
+          ingredients_en:dish.ingredients_en || "",
+          price:dish.price || ""
+        })
+      });
+
+      const data = await res.json();
+
+      if(data.success && data.dish){
+        batchDishes[i] = {
+          ...batchDishes[i],
+          name_he:data.dish.name_he || batchDishes[i].name_he || batchDishes[i].name_en,
+          description_he:data.dish.description_he || batchDishes[i].description_he || batchDishes[i].description_en,
+          ingredients_he:data.dish.ingredients_he || batchDishes[i].ingredients_he || batchDishes[i].ingredients_en
+        };
+      }
+    }catch(err){
+      console.error(`AI failed for dish ${i + 1}`, err);
+    }
+
+    renderBatchList();
+
+    if(i === currentBatchIndex){
+      fillForm(batchDishes[i], i);
+    }
   }
 }
 
@@ -818,7 +850,6 @@ function renderBatchList(){
   batchDishes.forEach((dish,index)=>{
     const item = document.createElement("div");
     item.className = "result-item";
-
     const activeText = index === currentBatchIndex ? "Current" : "Load";
 
     item.innerHTML = `
